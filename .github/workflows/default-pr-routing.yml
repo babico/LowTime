@@ -6,6 +6,7 @@ on:
       - opened
       - reopened
       - ready_for_review
+      - synchronize
 
 permissions:
   contents: read
@@ -41,3 +42,10 @@ jobs:
             } catch (error) {
               core.warning(`Could not request codex reviewer automatically: ${error.message}`);
             }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body: "@codex review",
+            });
