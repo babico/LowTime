@@ -18,6 +18,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - The repository is currently docs-first and greenfield.
 - The product, system, and delivery decisions are captured in `docs/`.
 - Monorepo scaffolding is in place for `apps/web`, `apps/server`, and `packages/shared`.
+- Docker Compose baseline is in place for local development and single-host deployment.
 
 ## Planned Stack
 - Web client: React + TypeScript + PWA shell
@@ -34,6 +35,8 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - `TODO.md`: living implementation tracker
 - `CONTRIBUTING.md`: workflow and documentation rules
 - `.github/`: GitHub issue templates, PR template, and workflow automation
+- `docker-compose.yml`: default local and single-host container stack
+- `.env.example`: baseline environment contract for Docker-based runs
 - `apps/`: application packages for the web client and backend server
 - `packages/`: shared contracts and reusable code
 - `docs/00-docs-map.md`: reading order and source-of-truth map
@@ -46,6 +49,12 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 4. Read [TODO.md](TODO.md) to see implementation status and the next features to build.
 5. Use the GitHub issue and PR templates in `.github/` when opening work on GitHub.
 6. Read the ADRs in [docs/adr/README.md](docs/adr/README.md) to understand why the major choices were made.
+
+## Docker Quick Start
+1. Optionally copy `.env.example` to `.env` to override the default host ports and service settings.
+2. Start the baseline stack with `docker compose up --build`.
+3. Open the web app on `http://localhost:5173`.
+4. Check the server health endpoint on `http://localhost:3000/health`.
 
 ## Documentation Index
 - Product: [docs/01-product-overview.md](docs/01-product-overview.md)
@@ -63,4 +72,5 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - Contribution workflow: [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md)
 - Implementation tracker: [TODO.md](TODO.md)
 - GitHub templates and routing: `.github/`
+- Docker baseline: `docker-compose.yml`, `.env.example`, `apps/web/Dockerfile`, `apps/server/Dockerfile`
 - Decisions: [docs/adr/README.md](docs/adr/README.md)
