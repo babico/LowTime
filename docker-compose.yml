@@ -1,0 +1,77 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://server:3000}
+    depends_on:
+      - server
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      HOST: 0.0.0.0
+      PORT: ${SERVER_PORT:-3000}
+      DATABASE_URL: postgres://${POSTGRES_USER:-lowtime}:${POSTGRES_PASSWORD:-lowtime}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-lowtime}
+      REDIS_URL: redis://redis:${REDIS_PORT:-6379}
+      LIVEKIT_URL: ${LIVEKIT_URL:-ws://livekit:7880}
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lowtime}
+      POSTGRES_USER: ${POSTGRES_USER:-lowtime}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lowtime}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  coturn:
+    image: coturn/coturn:4.6.2
+    command:
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --fingerprint
+      - --realm=${TURN_REALM:-lowtime.local}
+      - --min-port=${TURN_MIN_PORT:-49160}
+      - --max-port=${TURN_MAX_PORT:-49200}
+      - --lt-cred-mech
+      - --user=lowtime:lowtime
+    ports:
+      - "${COTURN_PORT:-3478}:3478/tcp"
+      - "${COTURN_PORT:-3478}:3478/udp"
+      - "${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}:${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49200}/udp"
+
+  livekit:
+    image: livekit/livekit-server:1.8
+    profiles:
+      - media
+    command:
+      - --dev
+      - --bind
+      - 0.0.0.0
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
+volumes:
+  postgres-data:
