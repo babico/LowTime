@@ -1,54 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CreateRoomResponse,
   JoinRoomResponse,
   QualityPreset,
-  RequestedMedia,
   RoomSummary,
 } from "@lowtime/shared";
 
-type ViewState =
-  | { kind: "home" }
-  | { kind: "room"; slug: string };
+import {
+  buildRequestedMedia,
+  getApiBaseUrl,
+  getViewState,
+  QUALITY_PRESET_OPTIONS,
+} from "./room-entry.js";
 
 const DEFAULT_QUALITY_PRESET: QualityPreset = "balanced";
-const DEFAULT_REQUESTED_MEDIA: RequestedMedia = {
-  audio: true,
-  video: true,
-};
-
-function getViewState(pathname: string): ViewState {
-  const roomMatch = pathname.match(/^\/r\/([A-Za-z0-9]+)$/);
-
-  if (roomMatch == null) {
-    return { kind: "home" };
-  }
-
-  return {
-    kind: "room",
-    slug: roomMatch[1],
-  };
-}
-
-function getApiBaseUrl(): string {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-
-  if (configuredBaseUrl != null && configuredBaseUrl.trim() !== "") {
-    return configuredBaseUrl.replace(/\/$/, "");
-  }
-
-  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-  const hostname = window.location.hostname || "localhost";
-  return `${protocol}//${hostname}:3000`;
-}
-
-function toAbsoluteJoinUrl(joinUrl: string): string {
-  return new URL(joinUrl, window.location.origin).toString();
-}
 
 export function App() {
-  const [viewState, setViewState] = useState<ViewState>(() => getViewState(window.location.pathname));
+  const [viewState, setViewState] = useState(() => getViewState(window.location.pathname));
   const [createResult, setCreateResult] = useState<CreateRoomResponse | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -58,11 +27,24 @@ export function App() {
   const [isLoadingRoom, setIsLoadingRoom] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
+  const [qualityPreset, setQualityPreset] = useState<QualityPreset>(DEFAULT_QUALITY_PRESET);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(true);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
   const [isJoining, setIsJoining] = useState(false);
 
-  const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
+  const [isPreparingPreview, setIsPreparingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewState, setPreviewState] = useState<"idle" | "ready">("idle");
+
+  const apiBaseUrl = useMemo(
+    () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
+    [],
+  );
+
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -76,12 +58,28 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (previewVideoRef.current != null) {
+      previewVideoRef.current.srcObject = previewStreamRef.current;
+    }
+  }, [previewState]);
+
+  useEffect(() => {
+    return () => {
+      stopPreviewStream(previewStreamRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (viewState.kind !== "room") {
+      stopPreviewStream(previewStreamRef.current);
+      previewStreamRef.current = null;
       setRoomSummary(null);
       setRoomError(null);
       setJoinError(null);
       setJoinResult(null);
       setDisplayName("");
+      setPreviewState("idle");
+      setPreviewError(null);
       setIsLoadingRoom(false);
       return;
     }
@@ -173,6 +171,41 @@ export function App() {
     setViewState(getViewState(window.location.pathname));
   }
 
+  async function handlePreparePreview() {
+    if (typeof navigator === "undefined" || navigator.mediaDevices?.getUserMedia == null) {
+      setPreviewError("This browser does not expose media preview in the current environment.");
+      setPreviewState("idle");
+      return;
+    }
+
+    if (!audioEnabled && !videoEnabled) {
+      setPreviewError("Enable audio or video before requesting device preview.");
+      setPreviewState("idle");
+      return;
+    }
+
+    setIsPreparingPreview(true);
+    setPreviewError(null);
+
+    try {
+      const nextStream = await navigator.mediaDevices.getUserMedia({
+        audio: audioEnabled,
+        video: videoEnabled,
+      });
+
+      stopPreviewStream(previewStreamRef.current);
+      previewStreamRef.current = nextStream;
+      setPreviewState("ready");
+    } catch (error) {
+      stopPreviewStream(previewStreamRef.current);
+      previewStreamRef.current = null;
+      setPreviewState("idle");
+      setPreviewError(error instanceof Error ? error.message : "Unable to prepare device preview");
+    } finally {
+      setIsPreparingPreview(false);
+    }
+  }
+
   async function handleJoinRoom() {
     if (viewState.kind !== "room") {
       return;
@@ -190,8 +223,8 @@ export function App() {
         },
         body: JSON.stringify({
           displayName,
-          qualityPreset: DEFAULT_QUALITY_PRESET,
-          requestedMedia: DEFAULT_REQUESTED_MEDIA,
+          qualityPreset,
+          requestedMedia: buildRequestedMedia(audioEnabled, videoEnabled),
         }),
       });
 
@@ -213,7 +246,7 @@ export function App() {
     return (
       <main>
         <h1>LowTime</h1>
-        <p>Open the room with only a display name. Media setup and token issuance come next.</p>
+        <p>Open the room with a display name, pick a quality preset, and preview devices before joining.</p>
         <p>
           <strong>Room slug:</strong> {viewState.slug}
         </p>
@@ -247,11 +280,67 @@ export function App() {
                   placeholder="Enter your name"
                 />
               </label>
+              <label>
+                Quality preset
+                <select
+                  value={qualityPreset}
+                  onChange={(event) => setQualityPreset(event.target.value as QualityPreset)}
+                >
+                  {QUALITY_PRESET_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p>
+                {
+                  QUALITY_PRESET_OPTIONS.find((option) => option.value === qualityPreset)?.description
+                }
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={audioEnabled}
+                  onChange={(event) => setAudioEnabled(event.target.checked)}
+                />{" "}
+                Join with audio
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={videoEnabled}
+                  onChange={(event) => setVideoEnabled(event.target.checked)}
+                />{" "}
+                Join with video
+              </label>
               <div>
+                <button type="button" onClick={() => void handlePreparePreview()} disabled={isPreparingPreview}>
+                  {isPreparingPreview ? "Preparing Preview..." : "Preview Devices"}
+                </button>{" "}
                 <button type="button" onClick={() => void handleJoinRoom()} disabled={isJoining}>
                   {isJoining ? "Joining..." : "Join Room"}
                 </button>
               </div>
+              {previewError ? <p role="alert">{previewError}</p> : null}
+              {previewState === "ready" ? (
+                <div>
+                  <p>Device preview ready.</p>
+                  {videoEnabled ? (
+                    <video
+                      ref={previewVideoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      style={{ width: "100%", maxWidth: "24rem", background: "#111" }}
+                    />
+                  ) : (
+                    <p>Microphone preview is ready. Video is currently off.</p>
+                  )}
+                </div>
+              ) : (
+                <p>Preview is optional but recommended before joining.</p>
+              )}
               {joinError ? <p role="alert">{joinError}</p> : null}
               {joinResult?.joinState === "direct" ? (
                 <p>
@@ -305,4 +394,14 @@ export function App() {
       ) : null}
     </main>
   );
+}
+
+function toAbsoluteJoinUrl(joinUrl: string): string {
+  return new URL(joinUrl, window.location.origin).toString();
+}
+
+function stopPreviewStream(stream: MediaStream | null) {
+  stream?.getTracks().forEach((track) => {
+    track.stop();
+  });
 }

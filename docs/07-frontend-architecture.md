@@ -29,6 +29,7 @@ The frontend is a React + TypeScript PWA optimized for mobile browsers first. It
   - collect passcode when needed
   - request media permissions after user intent
   - choose quality preset
+  - show device preview before join when the browser allows media access
 - `Waiting`
   - show lobby state and cancellation path
 - `Call`
@@ -93,3 +94,4 @@ The frontend is a React + TypeScript PWA optimized for mobile browsers first. It
 - Keep contract types in a shared package consumed by the client.
 - Build the media controller as a dedicated subsystem rather than mixing it into UI components.
 - Treat PWA support as shell enhancement, not as offline call support.
+- Current implementation supports display name entry, preset selection, media toggles, and a browser-driven preview step on `/r/:slug`.

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "types": [
+      "node",
       "vite/client"
     ]
   },
@@ -10,4 +11,3 @@
     "src"
   ]
 }
-
