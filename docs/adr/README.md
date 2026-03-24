@@ -23,6 +23,7 @@
 - [ADR-003-pwa-first.md](ADR-003-pwa-first.md)
 - [ADR-004-1to1-core-small-group-beta.md](ADR-004-1to1-core-small-group-beta.md)
 - [ADR-005-auto-plus-manual-quality-controls.md](ADR-005-auto-plus-manual-quality-controls.md)
+- [ADR-006-docker-first-deployment.md](ADR-006-docker-first-deployment.md)
 
 ## When To Add An ADR
 - When a decision changes system boundaries or long-term maintenance cost.

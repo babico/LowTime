@@ -26,6 +26,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - NAT traversal: coturn
 - Persistence: PostgreSQL for durable room metadata
 - Ephemeral state: Redis for presence, lobby, reconnect windows, and chat buffer
+- Packaging and deployment: Docker images with Docker Compose as the default local and single-host deployment path
 - Observability: structured logs, metrics, traces, and reliability dashboards
 
 ## Repository Map

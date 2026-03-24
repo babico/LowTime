@@ -26,6 +26,7 @@
 | Documentation | Root docs package | `done` | Baseline docs, diagrams, and ADRs created | [docs/00-docs-map.md](docs/00-docs-map.md) |
 | Documentation | Contribution and ADR workflow | `done` | Contributor rules and ADR policy documented | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Tooling | Monorepo scaffolding | `planned` | Create `apps/web`, `apps/server`, and `packages/shared` | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
+| Tooling | Dockerfiles and Compose baseline | `planned` | Default local and deployment packaging path | [docs/adr/ADR-006-docker-first-deployment.md](docs/adr/ADR-006-docker-first-deployment.md) |
 | Tooling | CI and linting baseline | `planned` | Add repo checks before feature work grows | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
 
 ## Phase 1: Core 1:1 Calling
@@ -88,6 +89,7 @@
 | PostgreSQL room metadata | `planned` | Durable room state and audit events | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 | Redis live room state | `planned` | Presence, lobby, reconnect, rate limits, chat buffer | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 | coturn integration | `planned` | NAT traversal and relay support | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
+| Docker-based deployment packaging | `planned` | Containerize web and server, with Compose as the default deployment path | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
 | Metrics, logs, and dashboards | `planned` | Product, media, and abuse visibility | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
 | Abuse and rate-limit controls | `planned` | Protect room creation and join paths | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
 

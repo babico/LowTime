@@ -12,9 +12,11 @@ The delivery plan prioritizes the smallest viable real-time path first, then lay
 ## Phase 0: Docs And Scaffolding
 - Deliver the root docs package and ADR baseline.
 - Scaffold the monorepo structure for web, server, and shared contracts.
+- Add Dockerfiles and a Compose baseline for the default local and deployment path.
 - Exit criteria:
   - docs package accepted
   - package layout chosen
+  - container baseline defined for web, server, postgres, redis, and coturn
   - CI and linting baseline defined
 
 ## Phase 1: Core 1:1 Calling

@@ -32,6 +32,11 @@ The backend is a Fastify application exposing REST endpoints and a WebSocket sig
 - `Cleanup worker`
   - expire rooms and transient state
 
+## Containerization Notes
+- The backend should ship as a Docker image and read all runtime configuration from environment variables.
+- Compose should be able to start the backend alongside PostgreSQL, Redis, and coturn without code changes.
+- The backend must support both managed and self-hosted LiveKit through configuration only.
+
 ## Signaling And Token Flow
 ```mermaid
 sequenceDiagram
@@ -83,4 +88,5 @@ A-->>C: room.snapshot
 ## Implementation Notes
 - Use Redis transactions or equivalent guards for participant-capacity races.
 - Separate room policy code from raw transport integration code to keep rules testable.
+- Keep startup and healthcheck behavior container-friendly for Compose and later orchestration.
 - Record host actions as audit events for debugging and abuse review.
