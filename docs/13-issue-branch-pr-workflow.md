@@ -15,6 +15,7 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - Use the GitHub issue templates when opening new work:
   - feature work: `.github/ISSUE_TEMPLATE/feature.yml`
   - defects and regressions: `.github/ISSUE_TEMPLATE/bug.yml`
+- Issue templates default new issues to assignee `babico`.
 - Use the issue to define:
   - the problem
   - the expected behavior
@@ -81,6 +82,8 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 
 ## 8. Request Review
 - Ask for human review through the normal GitHub review flow.
+- PRs are automatically assigned to `babico` by the repository workflow.
+- PRs automatically request `codex` as a reviewer through the repository workflow when GitHub accepts that reviewer account.
 - If Codex GitHub review is enabled for the repository, add a PR comment:
   - `@codex review`
 - Use the Codex review comment after the branch is pushed and the PR exists, so the bot can see the complete diff.

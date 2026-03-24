@@ -18,6 +18,7 @@
 - Include a short summary, changed docs or ADRs, testing performed, and rollout or migration notes if needed.
 - Reference any impacted source-of-truth doc directly in the pull request description.
 - Use the GitHub issue and PR templates in `.github/` to keep issue and review context consistent.
+- Issues default to assignee `babico`, and PRs are auto-routed to `babico` plus reviewer `codex` through the repository workflow.
 - Follow the full issue -> branch -> pull request process in [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md).
 
 ## Required Documentation Updates

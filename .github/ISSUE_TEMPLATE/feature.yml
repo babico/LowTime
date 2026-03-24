@@ -3,6 +3,8 @@ description: Create an implementation issue for a new feature or planned TODO it
 title: "[Feature] "
 labels:
   - enhancement
+assignees:
+  - babico
 body:
   - type: markdown
     attributes:
@@ -53,4 +55,3 @@ body:
       label: Acceptance notes
       description: Add any important acceptance criteria, testing expectations, or constraints.
       placeholder: Include tests, update TODO.md, and keep docs aligned in the same PR.
-

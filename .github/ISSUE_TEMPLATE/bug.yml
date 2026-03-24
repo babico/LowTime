@@ -3,6 +3,8 @@ description: Report a broken behavior, regression, or mismatch between docs and 
 title: "[Bug] "
 labels:
   - bug
+assignees:
+  - babico
 body:
   - type: markdown
     attributes:
@@ -57,4 +59,3 @@ body:
       label: Impact
       description: Explain severity, affected users, or rollout risk.
       placeholder: Breaks reconnect reliability and creates duplicate room presence.
-
