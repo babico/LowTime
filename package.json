@@ -1,0 +1,14 @@
+{
+  "name": "lowtime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LowTime monorepo scaffold for a low-bandwidth calling app.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}
+
