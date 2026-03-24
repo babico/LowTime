@@ -1,10 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { CreateRoomResponse, RoomSummary } from "@lowtime/shared";
+import type {
+  CreateRoomResponse,
+  JoinRoomResponse,
+  QualityPreset,
+  RequestedMedia,
+  RoomSummary,
+} from "@lowtime/shared";
 
 type ViewState =
   | { kind: "home" }
   | { kind: "room"; slug: string };
+
+const DEFAULT_QUALITY_PRESET: QualityPreset = "balanced";
+const DEFAULT_REQUESTED_MEDIA: RequestedMedia = {
+  audio: true,
+  video: true,
+};
 
 function getViewState(pathname: string): ViewState {
   const roomMatch = pathname.match(/^\/r\/([A-Za-z0-9]+)$/);
@@ -45,6 +57,11 @@ export function App() {
   const [roomError, setRoomError] = useState<string | null>(null);
   const [isLoadingRoom, setIsLoadingRoom] = useState(false);
 
+  const [displayName, setDisplayName] = useState("");
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
 
   useEffect(() => {
@@ -62,6 +79,9 @@ export function App() {
     if (viewState.kind !== "room") {
       setRoomSummary(null);
       setRoomError(null);
+      setJoinError(null);
+      setJoinResult(null);
+      setDisplayName("");
       setIsLoadingRoom(false);
       return;
     }
@@ -72,6 +92,8 @@ export function App() {
     async function loadRoom() {
       setIsLoadingRoom(true);
       setRoomError(null);
+      setJoinError(null);
+      setJoinResult(null);
 
       try {
         const response = await fetch(`${apiBaseUrl}/api/rooms/${slug}`, {
@@ -151,32 +173,104 @@ export function App() {
     setViewState(getViewState(window.location.pathname));
   }
 
+  async function handleJoinRoom() {
+    if (viewState.kind !== "room") {
+      return;
+    }
+
+    setIsJoining(true);
+    setJoinError(null);
+    setJoinResult(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/join`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          displayName,
+          qualityPreset: DEFAULT_QUALITY_PRESET,
+          requestedMedia: DEFAULT_REQUESTED_MEDIA,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message ?? "Unable to join room");
+      }
+
+      const payload = (await response.json()) as JoinRoomResponse;
+      setJoinResult(payload);
+    } catch (error) {
+      setJoinError(error instanceof Error ? error.message : "Unable to join room");
+    } finally {
+      setIsJoining(false);
+    }
+  }
+
   if (viewState.kind === "room") {
     return (
       <main>
         <h1>LowTime</h1>
-        <p>Share link opened. Join flow comes next, but the room is already live on the backend.</p>
+        <p>Open the room with only a display name. Media setup and token issuance come next.</p>
         <p>
           <strong>Room slug:</strong> {viewState.slug}
         </p>
         {isLoadingRoom ? <p>Loading room details...</p> : null}
         {roomError ? <p role="alert">{roomError}</p> : null}
         {roomSummary ? (
-          <section>
-            <h2>Room Preview</h2>
-            <p>
-              Access mode: <strong>{roomSummary.accessMode}</strong>
-            </p>
-            <p>
-              Max participants: <strong>{roomSummary.maxParticipants}</strong>
-            </p>
-            <p>
-              Quality cap: <strong>{roomSummary.qualityCap}</strong>
-            </p>
-            <p>
-              Expires at: <strong>{new Date(roomSummary.expiresAt).toLocaleString()}</strong>
-            </p>
-          </section>
+          <>
+            <section>
+              <h2>Room Preview</h2>
+              <p>
+                Access mode: <strong>{roomSummary.accessMode}</strong>
+              </p>
+              <p>
+                Max participants: <strong>{roomSummary.maxParticipants}</strong>
+              </p>
+              <p>
+                Quality cap: <strong>{roomSummary.qualityCap}</strong>
+              </p>
+              <p>
+                Expires at: <strong>{new Date(roomSummary.expiresAt).toLocaleString()}</strong>
+              </p>
+            </section>
+            <section>
+              <h2>Join Room</h2>
+              <label>
+                Display name
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="Enter your name"
+                />
+              </label>
+              <div>
+                <button type="button" onClick={() => void handleJoinRoom()} disabled={isJoining}>
+                  {isJoining ? "Joining..." : "Join Room"}
+                </button>
+              </div>
+              {joinError ? <p role="alert">{joinError}</p> : null}
+              {joinResult?.joinState === "direct" ? (
+                <p>
+                  Joined directly as <strong>{displayName.trim()}</strong>. Session{" "}
+                  <code>{joinResult.sessionId}</code> is ready for transport <code>{joinResult.transportPreference}</code>.
+                </p>
+              ) : null}
+              {joinResult?.joinState === "waiting" ? (
+                <p>
+                  Waiting for host approval. Request <code>{joinResult.requestId}</code> is queued.
+                </p>
+              ) : null}
+              {joinResult?.joinState === "denied" ? (
+                <p>
+                  Join denied: <strong>{joinResult.reason}</strong>
+                </p>
+              ) : null}
+            </section>
+          </>
         ) : null}
       </main>
     );
@@ -200,9 +294,7 @@ export function App() {
           <p>
             <strong>Host secret:</strong> {createResult.hostSecret}
           </p>
-          <p>
-            Store the host secret locally. It is not included in the room link.
-          </p>
+          <p>Store the host secret locally. It is not included in the room link.</p>
           <button type="button" onClick={() => void handleCopyLink()}>
             Copy Link
           </button>{" "}

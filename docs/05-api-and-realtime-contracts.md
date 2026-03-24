@@ -102,6 +102,11 @@ Response variants:
 }
 ```
 
+Current implementation notes:
+- `open` rooms return `direct` with a generated `sessionId` and `transportPreference` of `sfu`.
+- `lobby` rooms return `waiting` with a generated `requestId`.
+- `passcode` rooms currently deny with `passcode_required` or `invalid_passcode` because passcode verification is not implemented yet.
+
 ### `POST /api/rooms/:slug/token`
 Request body:
 ```json

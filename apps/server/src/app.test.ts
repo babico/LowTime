@@ -126,3 +126,134 @@ test("room endpoints answer CORS preflight requests", async () => {
 
   await app.close();
 });
+
+test("POST /api/rooms/:slug/join admits an open room with a display name", async () => {
+  const app = buildApp();
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+  });
+
+  const { roomSlug } = createResponse.json();
+
+  const response = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: {
+      displayName: "Sam",
+      qualityPreset: "balanced",
+      requestedMedia: {
+        audio: true,
+        video: true,
+      },
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().joinState, "direct");
+  assert.match(response.json().sessionId, /^sess_/);
+  assert.equal(response.json().transportPreference, "sfu");
+
+  await app.close();
+});
+
+test("POST /api/rooms/:slug/join validates the display name", async () => {
+  const app = buildApp();
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+  });
+
+  const { roomSlug } = createResponse.json();
+
+  const response = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: {
+      displayName: "   ",
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), {
+    message: "displayName is required",
+  });
+
+  await app.close();
+});
+
+test("POST /api/rooms/:slug/join returns waiting for lobby rooms", async () => {
+  const app = buildApp();
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+    payload: {
+      accessMode: "lobby",
+    },
+  });
+
+  const { roomSlug } = createResponse.json();
+
+  const response = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: {
+      displayName: "Lobby Guest",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().joinState, "waiting");
+  assert.match(response.json().requestId, /^req_/);
+
+  await app.close();
+});
+
+test("POST /api/rooms/:slug/join denies when the room is full", async () => {
+  const app = buildApp();
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+    payload: {
+      maxParticipants: 2,
+    },
+  });
+
+  const { roomSlug } = createResponse.json();
+
+  await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: {
+      displayName: "Sam",
+    },
+  });
+
+  await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: {
+      displayName: "Alex",
+    },
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: {
+      displayName: "Jordan",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    joinState: "denied",
+    reason: "room_full",
+  });
+
+  await app.close();
+});

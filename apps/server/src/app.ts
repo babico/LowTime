@@ -6,6 +6,8 @@ import type {
   AccessMode,
   CreateRoomRequest,
   CreateRoomResponse,
+  JoinRoomRequest,
+  JoinRoomResponse,
   QualityCap,
   RoomSlug,
   RoomSummary,
@@ -22,6 +24,7 @@ const QUALITY_CAPS: QualityCap[] = ["low", "balanced", "high"];
 
 interface StoredRoom extends RoomSummary {
   hostSecret: string;
+  sessions: StoredSession[];
 }
 
 interface CreateStoredRoomInput {
@@ -32,9 +35,15 @@ interface CreateStoredRoomInput {
   expiresAt: string;
 }
 
+interface StoredSession {
+  id: string;
+  displayName: string;
+}
+
 export interface RoomStore {
   createRoom(input: CreateStoredRoomInput): StoredRoom;
   getRoom(slug: RoomSlug): StoredRoom | undefined;
+  createSession(roomSlug: RoomSlug, displayName: string): StoredSession | undefined;
 }
 
 export interface BuildAppOptions {
@@ -107,6 +116,74 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   );
 
+  app.post<{ Params: { slug: string }; Body: JoinRoomRequest; Reply: JoinRoomResponse | { message: string } }>(
+    "/api/rooms/:slug/join",
+    async (request, reply) => {
+      const room = roomStore.getRoom(request.params.slug);
+
+      if (room == null) {
+        reply.code(404);
+        return {
+          message: "Room not found",
+        };
+      }
+
+      const validation = validateJoinRoomRequest(request.body ?? {});
+
+      if (!validation.ok) {
+        reply.code(400);
+        return {
+          message: validation.message,
+        };
+      }
+
+      if (room.status === "expired" || room.status === "closed") {
+        return {
+          joinState: "denied",
+          reason: "room_expired",
+        };
+      }
+
+      if (room.sessions.length >= room.maxParticipants) {
+        return {
+          joinState: "denied",
+          reason: "room_full",
+        };
+      }
+
+      if (room.accessMode === "passcode") {
+        return {
+          joinState: "denied",
+          reason: validation.value.passcode == null ? "passcode_required" : "invalid_passcode",
+        };
+      }
+
+      if (room.accessMode === "lobby") {
+        return {
+          joinState: "waiting",
+          requestId: createRequestId(),
+        };
+      }
+
+      const session = roomStore.createSession(room.slug, validation.value.displayName);
+
+      if (session == null) {
+        return {
+          joinState: "denied",
+          reason: "room_full",
+        };
+      }
+
+      room.status = "active";
+
+      return {
+        joinState: "direct",
+        sessionId: session.id,
+        transportPreference: "sfu",
+      };
+    },
+  );
+
   return app;
 }
 
@@ -130,6 +207,7 @@ export function createInMemoryRoomStore(): RoomStore {
         status: "created",
         expiresAt: input.expiresAt,
         hostSecret: createHostSecret(),
+        sessions: [],
       };
 
       rooms.set(slug, room);
@@ -138,6 +216,22 @@ export function createInMemoryRoomStore(): RoomStore {
     },
     getRoom(slug) {
       return rooms.get(slug);
+    },
+    createSession(roomSlug, displayName) {
+      const room = rooms.get(roomSlug);
+
+      if (room == null || room.sessions.length >= room.maxParticipants) {
+        return undefined;
+      }
+
+      const session: StoredSession = {
+        id: createSessionId(),
+        displayName,
+      };
+
+      room.sessions.push(session);
+
+      return session;
     },
   };
 }
@@ -193,6 +287,38 @@ function validateCreateRoomRequest(input: CreateRoomRequest): {
   };
 }
 
+function validateJoinRoomRequest(input: JoinRoomRequest): {
+  ok: true;
+  value: Required<Pick<JoinRoomRequest, "displayName">> & JoinRoomRequest;
+} | {
+  ok: false;
+  message: string;
+} {
+  const displayName = input.displayName?.trim();
+
+  if (displayName == null || displayName.length === 0) {
+    return {
+      ok: false,
+      message: "displayName is required",
+    };
+  }
+
+  if (displayName.length > 40) {
+    return {
+      ok: false,
+      message: "displayName must be 40 characters or fewer",
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      ...input,
+      displayName,
+    },
+  };
+}
+
 function toRoomSummary(room: StoredRoom): RoomSummary {
   return {
     slug: room.slug,
@@ -214,6 +340,14 @@ function createSlug(): RoomSlug {
 
 function createHostSecret(): string {
   return crypto.randomBytes(24).toString("base64url");
+}
+
+function createSessionId(): string {
+  return `sess_${crypto.randomBytes(8).toString("hex")}`;
+}
+
+function createRequestId(): string {
+  return `req_${crypto.randomBytes(8).toString("hex")}`;
 }
 
 export function parsePort(value: string | undefined): number {
