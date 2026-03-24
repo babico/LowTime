@@ -27,13 +27,13 @@
 | Documentation | Contribution and ADR workflow | `done` | Contributor rules and ADR policy documented | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Tooling | Monorepo scaffolding | `done` | Issue #1. Added root workspace files plus `apps/web`, `apps/server`, and `packages/shared` scaffolds | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
 | Tooling | Dockerfiles and Compose baseline | `done` | Issue #2. Added Dockerfiles for web and server, root compose stack, and baseline env contract | [docs/adr/ADR-006-docker-first-deployment.md](docs/adr/ADR-006-docker-first-deployment.md) |
-| Tooling | CI and linting baseline | `done` | Issue #3. Added workspace lint and typecheck scripts plus a GitHub Actions workflow for PR and main-branch checks | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
+| Tooling | CI and linting baseline | `done` | Issue #3. Added workspace lint, test, typecheck, and build checks plus a GitHub Actions workflow for PR and main-branch validation | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
 
 ## Phase 1: Core 1:1 Calling
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| Room creation endpoint and share link | `planned` | Includes host secret issuance | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
+| Room creation endpoint and share link | `done` | Issue #4. Added room creation, host secret issuance, room metadata lookup, and a web share-link flow | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
 | Public join flow with display name | `planned` | No registration required | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Join screen with device preview | `planned` | Includes permission flow and preset selection | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | SFU integration for 1:1 rooms | `planned` | LiveKit is the default media path | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |

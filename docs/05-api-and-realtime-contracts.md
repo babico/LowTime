@@ -51,6 +51,20 @@ Response body:
 }
 ```
 
+### `GET /api/rooms/:slug`
+Response body:
+```json
+{
+  "slug": "7Qn2kP9Zx4Lm",
+  "accessMode": "open",
+  "maxParticipants": 2,
+  "qualityCap": "balanced",
+  "allowScreenShare": true,
+  "status": "created",
+  "expiresAt": "2026-03-24T18:00:00Z"
+}
+```
+
 ### `POST /api/rooms/:slug/join`
 Request body:
 ```json
