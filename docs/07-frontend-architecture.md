@@ -93,4 +93,4 @@ The frontend is a React + TypeScript PWA optimized for mobile browsers first. It
 - Keep contract types in a shared package consumed by the client.
 - Build the media controller as a dedicated subsystem rather than mixing it into UI components.
 - Treat PWA support as shell enhancement, not as offline call support.
-- Current implementation supports room creation, display-name join on `/r/:slug`, and a minimal `/r/:slug/call` route that requests SFU credentials and connects to LiveKit.
+- Current implementation supports room creation, display-name join on `/r/:slug`, and a basic `/r/:slug/call` route with local self-view, remote tile area, and mute/camera/leave controls on top of LiveKit.

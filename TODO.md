@@ -37,7 +37,7 @@
 | Public join flow with display name | `done` | Issue #5. Added open-room admission, lobby waiting responses, and a no-registration join form on the room page | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Join screen with device preview | `planned` | Includes permission flow and preset selection | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | SFU integration for 1:1 rooms | `done` | Issue #7. Added LiveKit token issuance, a minimal `/r/:slug/call` handoff, and a web SFU connection flow for direct joins | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Basic in-call UI | `planned` | Remote tile, local self-view, leave/mute/camera controls | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Basic in-call UI | `done` | Issue #8. Added a usable call screen with remote tile area, local self-view, and mute/camera/leave controls on the LiveKit path | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Network health badge | `planned` | Surface degraded connectivity to the user | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
 | PWA shell and installability | `planned` | Manifest, shell caching, and install prompt behavior | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 
