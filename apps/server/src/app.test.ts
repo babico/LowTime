@@ -91,3 +91,38 @@ test("GET /api/rooms/:slug returns public room metadata", async () => {
 
   await app.close();
 });
+
+test("GET /api/rooms/:slug returns 404 for an unknown room", async () => {
+  const app = buildApp();
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/api/rooms/missing-room",
+  });
+
+  assert.equal(response.statusCode, 404);
+  assert.deepEqual(response.json(), {
+    message: "Room not found",
+  });
+
+  await app.close();
+});
+
+test("room endpoints answer CORS preflight requests", async () => {
+  const app = buildApp();
+
+  const response = await app.inject({
+    method: "OPTIONS",
+    url: "/api/rooms",
+    headers: {
+      origin: "http://localhost:5173",
+      "access-control-request-method": "POST",
+    },
+  });
+
+  assert.equal(response.statusCode, 204);
+  assert.equal(response.headers["access-control-allow-origin"], "http://localhost:5173");
+  assert.match(String(response.headers["access-control-allow-methods"]), /POST/);
+
+  await app.close();
+});

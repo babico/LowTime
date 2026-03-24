@@ -21,7 +21,14 @@ function getViewState(pathname: string): ViewState {
 
 function getApiBaseUrl(): string {
   const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  return configuredBaseUrl?.replace(/\/$/, "") || "http://localhost:3000";
+
+  if (configuredBaseUrl != null && configuredBaseUrl.trim() !== "") {
+    return configuredBaseUrl.replace(/\/$/, "");
+  }
+
+  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+  const hostname = window.location.hostname || "localhost";
+  return `${protocol}//${hostname}:3000`;
 }
 
 function toAbsoluteJoinUrl(joinUrl: string): string {

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import type {
@@ -48,6 +49,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   const now = options.now ?? (() => new Date());
   const roomStore = options.roomStore ?? createInMemoryRoomStore();
+
+  void app.register(cors, {
+    origin: true,
+    methods: ["GET", "POST", "OPTIONS"],
+  });
 
   app.get("/health", async () => {
     return {
