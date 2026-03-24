@@ -33,6 +33,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - `README.md`: project overview and doc entry point
 - `TODO.md`: living implementation tracker
 - `CONTRIBUTING.md`: workflow and documentation rules
+- `.github/`: GitHub issue templates, PR template, and workflow automation
 - `docs/00-docs-map.md`: reading order and source-of-truth map
 - `docs/adr/`: architecture decision records
 
@@ -41,7 +42,8 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 2. Read [docs/01-product-overview.md](docs/01-product-overview.md) for product scope and principles.
 3. Read [docs/02-system-architecture.md](docs/02-system-architecture.md) and [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) before implementation.
 4. Read [TODO.md](TODO.md) to see implementation status and the next features to build.
-5. Read the ADRs in [docs/adr/README.md](docs/adr/README.md) to understand why the major choices were made.
+5. Use the GitHub issue and PR templates in `.github/` when opening work on GitHub.
+6. Read the ADRs in [docs/adr/README.md](docs/adr/README.md) to understand why the major choices were made.
 
 ## Documentation Index
 - Product: [docs/01-product-overview.md](docs/01-product-overview.md)
@@ -58,4 +60,5 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - Delivery roadmap: [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md)
 - Contribution workflow: [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md)
 - Implementation tracker: [TODO.md](TODO.md)
+- GitHub templates and routing: `.github/`
 - Decisions: [docs/adr/README.md](docs/adr/README.md)
