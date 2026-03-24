@@ -17,7 +17,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 ## Current Status
 - The repository is currently docs-first and greenfield.
 - The product, system, and delivery decisions are captured in `docs/`.
-- Application packages have not been scaffolded yet.
+- Monorepo scaffolding is in place for `apps/web`, `apps/server`, and `packages/shared`.
 
 ## Planned Stack
 - Web client: React + TypeScript + PWA shell
@@ -34,6 +34,8 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - `TODO.md`: living implementation tracker
 - `CONTRIBUTING.md`: workflow and documentation rules
 - `.github/`: GitHub issue templates, PR template, and workflow automation
+- `apps/`: application packages for the web client and backend server
+- `packages/`: shared contracts and reusable code
 - `docs/00-docs-map.md`: reading order and source-of-truth map
 - `docs/adr/`: architecture decision records
 
