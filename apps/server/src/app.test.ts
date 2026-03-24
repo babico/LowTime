@@ -257,3 +257,34 @@ test("POST /api/rooms/:slug/join denies when the room is full", async () => {
 
   await app.close();
 });
+
+test("POST /api/rooms/:slug/join denies when the room TTL has already expired", async () => {
+  let currentTime = new Date("2026-03-24T12:00:00.000Z");
+  const app = buildApp({
+    now: () => currentTime,
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+  });
+
+  const { roomSlug } = createResponse.json();
+  currentTime = new Date("2026-03-24T15:00:00.000Z");
+
+  const response = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: {
+      displayName: "Late Guest",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    joinState: "denied",
+    reason: "room_expired",
+  });
+
+  await app.close();
+});
