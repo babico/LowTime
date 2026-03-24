@@ -17,6 +17,7 @@
 - Keep pull requests scoped to one main concern.
 - Include a short summary, changed docs or ADRs, testing performed, and rollout or migration notes if needed.
 - Reference any impacted source-of-truth doc directly in the pull request description.
+- Use the GitHub issue and PR templates in `.github/` to keep issue and review context consistent.
 - Follow the full issue -> branch -> pull request process in [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md).
 
 ## Required Documentation Updates

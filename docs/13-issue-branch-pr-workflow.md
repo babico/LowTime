@@ -12,6 +12,9 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 ## 1. Start With An Issue
 - Create or select an issue before writing code.
 - Keep one main outcome per issue.
+- Use the GitHub issue templates when opening new work:
+  - feature work: `.github/ISSUE_TEMPLATE/feature.yml`
+  - defects and regressions: `.github/ISSUE_TEMPLATE/bug.yml`
 - Use the issue to define:
   - the problem
   - the expected behavior
@@ -58,6 +61,7 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - Set upstream tracking on first push so follow-up pushes are simple.
 - Open the PR when the branch is reviewable, not only when it is perfect.
 - Keep the pull request scoped to one main concern.
+- Start from the GitHub pull request template so the required summary, docs, testing, and workflow checks are not skipped.
 - The PR description should include:
   - what changed
   - why it changed
@@ -112,17 +116,19 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 
 ## Example Flow
 1. Open issue: `Add room creation endpoint`.
+   Use the feature issue template in `.github/ISSUE_TEMPLATE/feature.yml`.
 2. Read [05-api-and-realtime-contracts.md](05-api-and-realtime-contracts.md) and [03-room-and-user-flows.md](03-room-and-user-flows.md).
 3. Create branch: `feature/room-create-api`.
 4. Implement endpoint, tests, and docs updates.
 5. Update [TODO.md](../TODO.md) to mark the feature `in_progress` and then `done`.
 6. Push the branch to GitHub.
-7. Open PR with linked issue, summary, tests, and changed docs.
+7. Open PR with linked issue, summary, tests, and changed docs using `.github/PULL_REQUEST_TEMPLATE.md`.
 8. Comment `@codex review` if the repository has Codex review enabled.
 9. Merge after review and close the issue.
 
 ## Failure Modes To Avoid
 - Coding without an issue or clear task owner.
+- Ignoring the GitHub issue or PR templates and leaving out required context.
 - Mixing unrelated features in one branch.
 - Forgetting to push the branch before asking for PR review.
 - Merging code without updating the matching docs.

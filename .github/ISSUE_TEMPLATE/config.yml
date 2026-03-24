@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: LowTime Contribution Workflow
+    url: https://github.com/babico/LowTime/blob/main/docs/13-issue-branch-pr-workflow.md
+    about: Read the documented issue, branch, pull request, and review process before opening work items.
+  - name: LowTime Docs Map
+    url: https://github.com/babico/LowTime/blob/main/docs/00-docs-map.md
+    about: Find the source-of-truth doc for the feature or subsystem you want to change.
+

@@ -1,0 +1,56 @@
+name: Feature request
+description: Create an implementation issue for a new feature or planned TODO item.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for planned features and improvements.
+        Before opening the issue, check the workflow guide and the source-of-truth docs.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the feature.
+      placeholder: Add room creation endpoint
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or goal
+      description: What user or system problem does this solve?
+      placeholder: We need a backend endpoint so hosts can create rooms and receive a shareable link.
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      description: Describe the intended outcome.
+      placeholder: A host can create a room, receive a slug and host secret, and proceed to the join preview.
+    validations:
+      required: true
+  - type: input
+    id: source_doc
+    attributes:
+      label: Source-of-truth doc
+      description: Link the doc that defines this behavior.
+      placeholder: docs/05-api-and-realtime-contracts.md
+    validations:
+      required: true
+  - type: input
+    id: todo_row
+    attributes:
+      label: Related TODO item
+      description: Reference the matching feature in TODO.md if it exists.
+      placeholder: Room creation endpoint and share link
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance notes
+      description: Add any important acceptance criteria, testing expectations, or constraints.
+      placeholder: Include tests, update TODO.md, and keep docs aligned in the same PR.
+

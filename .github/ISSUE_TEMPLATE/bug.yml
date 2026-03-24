@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a broken behavior, regression, or mismatch between docs and implementation.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for defects and regressions.
+        If the bug is caused by docs drift, include the source-of-truth doc that is affected.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the bug.
+      placeholder: Reconnect window does not restore the participant session
+    validations:
+      required: true
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual behavior
+      description: What happens now?
+      placeholder: The user is treated as a new participant after a short disconnect.
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      description: What should happen instead?
+      placeholder: The previous session should be restored during the reconnect window.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide steps to reproduce the issue.
+      placeholder: |
+        1. Join a room
+        2. Disconnect for less than 5 minutes
+        3. Reconnect
+        4. Observe duplicate participant state
+    validations:
+      required: true
+  - type: input
+    id: source_doc
+    attributes:
+      label: Source-of-truth doc
+      description: Link the related behavior doc if known.
+      placeholder: docs/06-data-model-and-lifecycle.md
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Explain severity, affected users, or rollout risk.
+      placeholder: Breaks reconnect reliability and creates duplicate room presence.
+
