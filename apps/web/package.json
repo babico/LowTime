@@ -6,19 +6,23 @@
   "scripts": {
     "dev": "vite",
     "lint": "eslint src --ext .ts,.tsx --max-warnings=0",
+    "test": "node --import tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@lowtime/shared": "^0.1.0",
+    "livekit-client": "^2.15.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@types/node": "^22.15.30",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.5.0",
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.4"
   }

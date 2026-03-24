@@ -1,16 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CreateRoomResponse,
   JoinRoomResponse,
+  MediaTokenResponse,
   QualityPreset,
   RequestedMedia,
   RoomSummary,
 } from "@lowtime/shared";
 
-type ViewState =
-  | { kind: "home" }
-  | { kind: "room"; slug: string };
+import { connectToSfu } from "./media-controller.js";
+import {
+  buildRequestedMedia,
+  clearStoredCallSession,
+  getApiBaseUrl,
+  getCallRoute,
+  getViewState,
+  loadStoredCallSession,
+  saveStoredCallSession,
+  type StoredCallSession,
+} from "./room-entry.js";
 
 const DEFAULT_QUALITY_PRESET: QualityPreset = "balanced";
 const DEFAULT_REQUESTED_MEDIA: RequestedMedia = {
@@ -18,37 +27,8 @@ const DEFAULT_REQUESTED_MEDIA: RequestedMedia = {
   video: true,
 };
 
-function getViewState(pathname: string): ViewState {
-  const roomMatch = pathname.match(/^\/r\/([A-Za-z0-9]+)$/);
-
-  if (roomMatch == null) {
-    return { kind: "home" };
-  }
-
-  return {
-    kind: "room",
-    slug: roomMatch[1],
-  };
-}
-
-function getApiBaseUrl(): string {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-
-  if (configuredBaseUrl != null && configuredBaseUrl.trim() !== "") {
-    return configuredBaseUrl.replace(/\/$/, "");
-  }
-
-  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-  const hostname = window.location.hostname || "localhost";
-  return `${protocol}//${hostname}:3000`;
-}
-
-function toAbsoluteJoinUrl(joinUrl: string): string {
-  return new URL(joinUrl, window.location.origin).toString();
-}
-
 export function App() {
-  const [viewState, setViewState] = useState<ViewState>(() => getViewState(window.location.pathname));
+  const [viewState, setViewState] = useState(() => getViewState(window.location.pathname));
   const [createResult, setCreateResult] = useState<CreateRoomResponse | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -62,7 +42,18 @@ export function App() {
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
   const [isJoining, setIsJoining] = useState(false);
 
-  const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
+  const [callSession, setCallSession] = useState<StoredCallSession | null>(null);
+  const [callStatus, setCallStatus] = useState<"idle" | "requesting_token" | "connecting" | "connected">("idle");
+  const [callError, setCallError] = useState<string | null>(null);
+  const [callParticipants, setCallParticipants] = useState(0);
+  const [connectedSfuUrl, setConnectedSfuUrl] = useState<string | null>(null);
+
+  const apiBaseUrl = useMemo(
+    () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
+    [],
+  );
+
+  const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -76,13 +67,20 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (viewState.kind === "room") {
+      return;
+    }
+
+    setRoomSummary(null);
+    setRoomError(null);
+    setJoinError(null);
+    setJoinResult(null);
+    setDisplayName("");
+    setIsLoadingRoom(false);
+  }, [viewState]);
+
+  useEffect(() => {
     if (viewState.kind !== "room") {
-      setRoomSummary(null);
-      setRoomError(null);
-      setJoinError(null);
-      setJoinResult(null);
-      setDisplayName("");
-      setIsLoadingRoom(false);
       return;
     }
 
@@ -127,6 +125,118 @@ export function App() {
       abortController.abort();
     };
   }, [apiBaseUrl, viewState]);
+
+  useEffect(() => {
+    if (viewState.kind !== "call") {
+      setCallSession(null);
+      setCallStatus("idle");
+      setCallError(null);
+      setCallParticipants(0);
+      setConnectedSfuUrl(null);
+      callRoomRef.current?.disconnect();
+      callRoomRef.current = null;
+      return;
+    }
+
+    const storedSession = loadStoredCallSession(window.sessionStorage, viewState.slug);
+
+    if (storedSession == null) {
+      setCallSession(null);
+      setCallStatus("idle");
+      setCallError("Missing local call session. Rejoin from the room page.");
+      return;
+    }
+
+    setCallSession(storedSession);
+    setCallError(null);
+  }, [viewState]);
+
+  useEffect(() => {
+    if (viewState.kind !== "call" || callSession == null) {
+      return;
+    }
+
+    const callSlug = viewState.slug;
+    const activeCallSession = callSession;
+    let cancelled = false;
+
+    async function connectCall() {
+      setCallStatus("requesting_token");
+      setCallError(null);
+      setConnectedSfuUrl(null);
+
+      try {
+        const tokenResponse = await fetch(`${apiBaseUrl}/api/rooms/${callSlug}/token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId: activeCallSession.sessionId,
+            transportPreference: activeCallSession.transportPreference,
+          }),
+        });
+
+        if (!tokenResponse.ok) {
+          const payload = (await tokenResponse.json()) as { message?: string };
+          throw new Error(payload.message ?? "Unable to request media token");
+        }
+
+        const credentials = (await tokenResponse.json()) as MediaTokenResponse;
+
+        if (credentials.transport !== "sfu") {
+          throw new Error("Only SFU transport is currently supported in the web client");
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setCallStatus("connecting");
+
+        const room = await connectToSfu({
+          credentials,
+          requestedMedia: activeCallSession.requestedMedia,
+        });
+
+        if (cancelled) {
+          room.disconnect();
+          return;
+        }
+
+        room.on("participantConnected", () => {
+          setCallParticipants(room.remoteParticipants.size + 1);
+        });
+
+        room.on("participantDisconnected", () => {
+          setCallParticipants(room.remoteParticipants.size + 1);
+        });
+
+        room.on("disconnected", () => {
+          setCallStatus("idle");
+        });
+
+        callRoomRef.current?.disconnect();
+        callRoomRef.current = room;
+        setCallParticipants(room.remoteParticipants.size + 1);
+        setConnectedSfuUrl(credentials.sfuUrl);
+        setCallStatus("connected");
+      } catch (error) {
+        if (!cancelled) {
+          setCallStatus("idle");
+          setCallError(error instanceof Error ? error.message : "Unable to connect to the SFU");
+        }
+      }
+    }
+
+    void connectCall();
+
+    return () => {
+      cancelled = true;
+      callRoomRef.current?.disconnect();
+      callRoomRef.current = null;
+    };
+  }, [apiBaseUrl, callSession, viewState]);
 
   async function handleCreateRoom() {
     setIsCreating(true);
@@ -202,6 +312,19 @@ export function App() {
 
       const payload = (await response.json()) as JoinRoomResponse;
       setJoinResult(payload);
+
+      if (payload.joinState === "direct") {
+        saveStoredCallSession(window.sessionStorage, viewState.slug, {
+          sessionId: payload.sessionId,
+          displayName: displayName.trim(),
+          qualityPreset: DEFAULT_QUALITY_PRESET,
+          transportPreference: payload.transportPreference,
+          requestedMedia: buildRequestedMedia(DEFAULT_REQUESTED_MEDIA.audio, DEFAULT_REQUESTED_MEDIA.video),
+        });
+
+        window.history.pushState({}, "", getCallRoute(viewState.slug));
+        setViewState(getViewState(window.location.pathname));
+      }
     } catch (error) {
       setJoinError(error instanceof Error ? error.message : "Unable to join room");
     } finally {
@@ -209,11 +332,79 @@ export function App() {
     }
   }
 
+  function handleLeaveCall() {
+    if (viewState.kind !== "call") {
+      return;
+    }
+
+    callRoomRef.current?.disconnect();
+    callRoomRef.current = null;
+    clearStoredCallSession(window.sessionStorage, viewState.slug);
+    window.history.pushState({}, "", `/r/${viewState.slug}`);
+    setViewState(getViewState(window.location.pathname));
+  }
+
+  if (viewState.kind === "call") {
+    return (
+      <main>
+        <h1>LowTime</h1>
+        <p>This is the first end-to-end SFU handoff. Rich in-call controls come next.</p>
+        <p>
+          <strong>Room slug:</strong> {viewState.slug}
+        </p>
+        {callSession ? (
+          <section>
+            <h2>Call Connection</h2>
+            <p>
+              Joining as <strong>{callSession.displayName}</strong> with transport{" "}
+              <code>{callSession.transportPreference}</code>.
+            </p>
+            <p>
+              Requested media: audio <strong>{callSession.requestedMedia.audio ? "on" : "off"}</strong>, video{" "}
+              <strong>{callSession.requestedMedia.video ? "on" : "off"}</strong>.
+            </p>
+            <p>
+              Connection state: <strong>{callStatus}</strong>
+            </p>
+            {connectedSfuUrl ? (
+              <p>
+                Connected SFU URL: <code>{connectedSfuUrl}</code>
+              </p>
+            ) : null}
+            {callStatus === "connected" ? (
+              <p>
+                Live room connected with <strong>{callParticipants}</strong> participant(s) currently visible to the
+                client.
+              </p>
+            ) : null}
+            {callError ? <p role="alert">{callError}</p> : null}
+            <button type="button" onClick={handleLeaveCall}>
+              Leave Call
+            </button>
+          </section>
+        ) : (
+          <>
+            {callError ? <p role="alert">{callError}</p> : null}
+            <button
+              type="button"
+              onClick={() => {
+                window.history.pushState({}, "", `/r/${viewState.slug}`);
+                setViewState(getViewState(window.location.pathname));
+              }}
+            >
+              Back To Join Screen
+            </button>
+          </>
+        )}
+      </main>
+    );
+  }
+
   if (viewState.kind === "room") {
     return (
       <main>
         <h1>LowTime</h1>
-        <p>Open the room with only a display name. Media setup and token issuance come next.</p>
+        <p>Open the room with only a display name, then move straight into the first SFU-backed call path.</p>
         <p>
           <strong>Room slug:</strong> {viewState.slug}
         </p>
@@ -253,12 +444,6 @@ export function App() {
                 </button>
               </div>
               {joinError ? <p role="alert">{joinError}</p> : null}
-              {joinResult?.joinState === "direct" ? (
-                <p>
-                  Joined directly as <strong>{displayName.trim()}</strong>. Session{" "}
-                  <code>{joinResult.sessionId}</code> is ready for transport <code>{joinResult.transportPreference}</code>.
-                </p>
-              ) : null}
               {joinResult?.joinState === "waiting" ? (
                 <p>
                   Waiting for host approval. Request <code>{joinResult.requestId}</code> is queued.
@@ -279,7 +464,7 @@ export function App() {
   return (
     <main>
       <h1>LowTime</h1>
-      <p>Create a room fast, share the link, and keep the call ready for the join flow that comes next.</p>
+      <p>Create a room fast, share the link, and move directly into the SFU-backed join flow.</p>
       <button type="button" onClick={() => void handleCreateRoom()} disabled={isCreating}>
         {isCreating ? "Creating..." : "Start Call"}
       </button>
@@ -305,4 +490,8 @@ export function App() {
       ) : null}
     </main>
   );
+}
+
+function toAbsoluteJoinUrl(joinUrl: string): string {
+  return new URL(joinUrl, window.location.origin).toString();
 }

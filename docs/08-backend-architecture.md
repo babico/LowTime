@@ -90,3 +90,4 @@ A-->>C: room.snapshot
 - Separate room policy code from raw transport integration code to keep rules testable.
 - Keep startup and healthcheck behavior container-friendly for Compose and later orchestration.
 - Record host actions as audit events for debugging and abuse review.
+- Current implementation signs LiveKit room tokens directly in the Fastify service for admitted sessions and returns them through `POST /api/rooms/:slug/token`.
