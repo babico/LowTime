@@ -11,7 +11,21 @@ app.get("/health", async () => {
   };
 });
 
-const port = Number(process.env.PORT ?? 3000);
+function parsePort(value: string | undefined): number {
+  if (value == null || value.trim() === "") {
+    return 3000;
+  }
+
+  const port = Number(value);
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("PORT must be an integer between 1 and 65535");
+  }
+
+  return port;
+}
+
+const port = parsePort(process.env.PORT);
 const host = process.env.HOST ?? "0.0.0.0";
 
 app
@@ -23,4 +37,3 @@ app
     app.log.error(error);
     process.exit(1);
   });
-
