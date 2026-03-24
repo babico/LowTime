@@ -265,6 +265,8 @@ export function App() {
         room.on("participantDisconnected", syncCallPresentation);
         room.on("trackSubscribed", syncCallPresentation);
         room.on("trackUnsubscribed", syncCallPresentation);
+        room.on("trackMuted", syncCallPresentation);
+        room.on("trackUnmuted", syncCallPresentation);
         room.on("localTrackPublished", syncCallPresentation);
         room.on("localTrackUnpublished", syncCallPresentation);
 
