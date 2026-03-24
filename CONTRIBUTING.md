@@ -4,7 +4,7 @@
 - Audience: Engineers, technical writers, and reviewers.
 - Status: Baseline
 - Last Updated: 2026-03-24
-- Related Docs: [README](README.md), [Docs Map](docs/00-docs-map.md), [ADR Index](docs/adr/README.md)
+- Related Docs: [README](README.md), [Docs Map](docs/00-docs-map.md), [Workflow Guide](docs/13-issue-branch-pr-workflow.md), [ADR Index](docs/adr/README.md)
 
 ## Working Agreement
 - Treat the docs in this repository as part of the product, not as after-the-fact notes.
@@ -16,6 +16,7 @@
 - Keep pull requests scoped to one main concern.
 - Include a short summary, changed docs or ADRs, testing performed, and rollout or migration notes if needed.
 - Reference any impacted source-of-truth doc directly in the pull request description.
+- Follow the full issue -> branch -> pull request process in [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md).
 
 ## Required Documentation Updates
 - Update [TODO.md](TODO.md) whenever a tracked feature changes status.

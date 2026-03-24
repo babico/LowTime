@@ -15,8 +15,9 @@
 6. [07-frontend-architecture.md](07-frontend-architecture.md) and [08-backend-architecture.md](08-backend-architecture.md) for ownership and subsystem design.
 7. [09-security-and-abuse.md](09-security-and-abuse.md), [10-observability-and-operations.md](10-observability-and-operations.md), and [11-testing-and-qa.md](11-testing-and-qa.md) before shipping.
 8. [12-roadmap-and-release-phases.md](12-roadmap-and-release-phases.md) for sequencing and milestone gates.
-9. [TODO.md](../TODO.md) for live implementation status.
-10. [adr/README.md](adr/README.md) for the why behind major architecture choices.
+9. [13-issue-branch-pr-workflow.md](13-issue-branch-pr-workflow.md) for the contributor delivery process.
+10. [TODO.md](../TODO.md) for live implementation status.
+11. [adr/README.md](adr/README.md) for the why behind major architecture choices.
 
 ## Source Of Truth Rules
 - Product goals and scope live in [01-product-overview.md](01-product-overview.md).
