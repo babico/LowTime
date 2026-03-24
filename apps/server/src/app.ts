@@ -64,7 +64,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   const now = options.now ?? (() => new Date());
   const roomStore = options.roomStore ?? createInMemoryRoomStore();
-  const liveKitConfig = options.liveKitConfig ?? getLiveKitConfig();
+  const liveKitConfig = options.liveKitConfig === undefined ? getLiveKitConfig() : options.liveKitConfig;
 
   void app.register(cors, {
     origin: true,
