@@ -19,6 +19,7 @@
 - Reference any impacted source-of-truth doc directly in the pull request description.
 - Use the GitHub issue and PR templates in `.github/` to keep issue and review context consistent.
 - Issues default to assignee `babico`, and PRs are auto-routed to `babico` plus reviewer `codex` through the repository workflow.
+- The repository workflow also adds an `@codex review` comment automatically when a PR opens or receives new commits.
 - Follow the full issue -> branch -> pull request process in [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md).
 
 ## Required Documentation Updates

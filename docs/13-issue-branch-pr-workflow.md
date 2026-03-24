@@ -84,9 +84,8 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - Ask for human review through the normal GitHub review flow.
 - PRs are automatically assigned to `babico` by the repository workflow.
 - PRs automatically request `codex` as a reviewer through the repository workflow when GitHub accepts that reviewer account.
-- If Codex GitHub review is enabled for the repository, add a PR comment:
-  - `@codex review`
-- Use the Codex review comment after the branch is pushed and the PR exists, so the bot can see the complete diff.
+- The repository workflow also posts `@codex review` automatically when a PR is opened, reopened, marked ready, or updated with new commits.
+- A manual `@codex review` comment is still useful when you want to retrigger review outside those workflow events.
 - Treat bot review as additional feedback, not a replacement for checking docs, tests, and scope yourself.
 
 ## 9. Pull Request Checklist
@@ -101,7 +100,7 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - ADRs were updated if a long-lived design decision changed.
 - The branch has been pushed to GitHub.
 - The PR is open against `main`.
-- Review has been requested, including `@codex review` when that integration is available.
+- Review has been requested, including the automatic or manual `@codex review` trigger when that integration is available.
 
 ## 10. Review Expectations
 - Reviewers should prioritize correctness, regressions, missing tests, and docs drift.
@@ -126,7 +125,7 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 5. Update [TODO.md](../TODO.md) to mark the feature `in_progress` and then `done`.
 6. Push the branch to GitHub.
 7. Open PR with linked issue, summary, tests, and changed docs using `.github/PULL_REQUEST_TEMPLATE.md`.
-8. Comment `@codex review` if the repository has Codex review enabled.
+8. Let the repository automation request Codex review and post `@codex review`, or comment it manually if you need to retrigger the bot later.
 9. Merge after review and close the issue.
 
 ## Failure Modes To Avoid
