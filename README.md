@@ -20,7 +20,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - Monorepo scaffolding is in place for `apps/web`, `apps/server`, and `packages/shared`.
 - Docker Compose baseline is in place for local development and single-host deployment.
 - CI and linting baseline is in place for pull requests and pushes to `main`.
-- Room creation, share-link generation, public join admission, and the first SFU-backed token handoff are in place for the core 1:1 flow.
+- Room creation, share-link generation, public join admission, SFU token handoff, and the first basic in-call UI are in place for the core 1:1 flow.
 
 ## Planned Stack
 - Web client: React + TypeScript + PWA shell

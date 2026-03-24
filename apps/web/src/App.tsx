@@ -9,6 +9,7 @@ import type {
   RoomSummary,
 } from "@lowtime/shared";
 
+import { getFirstVideoTrack, getParticipantLabel, type ParticipantLike, type VideoTrackLike } from "./call-experience.js";
 import { connectToSfu } from "./media-controller.js";
 import {
   buildRequestedMedia,
@@ -47,6 +48,13 @@ export function App() {
   const [callError, setCallError] = useState<string | null>(null);
   const [callParticipants, setCallParticipants] = useState(0);
   const [connectedSfuUrl, setConnectedSfuUrl] = useState<string | null>(null);
+  const [isMicEnabled, setIsMicEnabled] = useState(DEFAULT_REQUESTED_MEDIA.audio);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(DEFAULT_REQUESTED_MEDIA.video);
+  const [isTogglingMic, setIsTogglingMic] = useState(false);
+  const [isTogglingCamera, setIsTogglingCamera] = useState(false);
+  const [localVideoTrack, setLocalVideoTrack] = useState<VideoTrackLike | null>(null);
+  const [remoteVideoTrack, setRemoteVideoTrack] = useState<VideoTrackLike | null>(null);
+  const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
 
   const apiBaseUrl = useMemo(
     () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
@@ -54,6 +62,8 @@ export function App() {
   );
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -133,6 +143,13 @@ export function App() {
       setCallError(null);
       setCallParticipants(0);
       setConnectedSfuUrl(null);
+      setIsMicEnabled(DEFAULT_REQUESTED_MEDIA.audio);
+      setIsCameraEnabled(DEFAULT_REQUESTED_MEDIA.video);
+      setIsTogglingMic(false);
+      setIsTogglingCamera(false);
+      setLocalVideoTrack(null);
+      setRemoteVideoTrack(null);
+      setRemoteParticipantLabel("Waiting for someone to join");
       callRoomRef.current?.disconnect();
       callRoomRef.current = null;
       return;
@@ -149,7 +166,37 @@ export function App() {
 
     setCallSession(storedSession);
     setCallError(null);
+    setIsMicEnabled(storedSession.requestedMedia.audio);
+    setIsCameraEnabled(storedSession.requestedMedia.video);
   }, [viewState]);
+
+  useEffect(() => {
+    const videoElement = localVideoRef.current;
+
+    if (videoElement == null || localVideoTrack == null) {
+      return;
+    }
+
+    localVideoTrack.attach(videoElement);
+
+    return () => {
+      localVideoTrack.detach(videoElement);
+    };
+  }, [localVideoTrack]);
+
+  useEffect(() => {
+    const videoElement = remoteVideoRef.current;
+
+    if (videoElement == null || remoteVideoTrack == null) {
+      return;
+    }
+
+    remoteVideoTrack.attach(videoElement);
+
+    return () => {
+      remoteVideoTrack.detach(videoElement);
+    };
+  }, [remoteVideoTrack]);
 
   useEffect(() => {
     if (viewState.kind !== "call" || callSession == null) {
@@ -204,22 +251,34 @@ export function App() {
           return;
         }
 
-        room.on("participantConnected", () => {
-          setCallParticipants(room.remoteParticipants.size + 1);
-        });
+        const syncCallPresentation = () => {
+          const remoteParticipant = Array.from(room.remoteParticipants.values())[0] as ParticipantLike | undefined;
+          const nextRemoteParticipant = remoteParticipant ?? null;
 
-        room.on("participantDisconnected", () => {
           setCallParticipants(room.remoteParticipants.size + 1);
-        });
+          setLocalVideoTrack(getFirstVideoTrack(room.localParticipant as unknown as ParticipantLike));
+          setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
+          setRemoteParticipantLabel(getParticipantLabel(nextRemoteParticipant, "Waiting for someone to join"));
+        };
+
+        room.on("participantConnected", syncCallPresentation);
+        room.on("participantDisconnected", syncCallPresentation);
+        room.on("trackSubscribed", syncCallPresentation);
+        room.on("trackUnsubscribed", syncCallPresentation);
+        room.on("localTrackPublished", syncCallPresentation);
+        room.on("localTrackUnpublished", syncCallPresentation);
 
         room.on("disconnected", () => {
           setCallStatus("idle");
+          setRemoteVideoTrack(null);
+          setLocalVideoTrack(null);
+          setRemoteParticipantLabel("Waiting for someone to join");
         });
 
         callRoomRef.current?.disconnect();
         callRoomRef.current = room;
-        setCallParticipants(room.remoteParticipants.size + 1);
         setConnectedSfuUrl(credentials.sfuUrl);
+        syncCallPresentation();
         setCallStatus("connected");
       } catch (error) {
         if (!cancelled) {
@@ -344,43 +403,151 @@ export function App() {
     setViewState(getViewState(window.location.pathname));
   }
 
+  async function handleToggleMicrophone() {
+    if (callRoomRef.current == null) {
+      return;
+    }
+
+    const nextValue = !isMicEnabled;
+    setIsTogglingMic(true);
+    setCallError(null);
+
+    try {
+      await callRoomRef.current.localParticipant.setMicrophoneEnabled(nextValue);
+      setIsMicEnabled(nextValue);
+    } catch (error) {
+      setCallError(error instanceof Error ? error.message : "Unable to update microphone state");
+    } finally {
+      setIsTogglingMic(false);
+    }
+  }
+
+  async function handleToggleCamera() {
+    if (callRoomRef.current == null) {
+      return;
+    }
+
+    const nextValue = !isCameraEnabled;
+    setIsTogglingCamera(true);
+    setCallError(null);
+
+    try {
+      await callRoomRef.current.localParticipant.setCameraEnabled(nextValue);
+      setIsCameraEnabled(nextValue);
+      setLocalVideoTrack(
+        nextValue ? getFirstVideoTrack(callRoomRef.current.localParticipant as unknown as ParticipantLike) : null,
+      );
+    } catch (error) {
+      setCallError(error instanceof Error ? error.message : "Unable to update camera state");
+    } finally {
+      setIsTogglingCamera(false);
+    }
+  }
+
   if (viewState.kind === "call") {
     return (
-      <main>
-        <h1>LowTime</h1>
-        <p>This is the first end-to-end SFU handoff. Rich in-call controls come next.</p>
-        <p>
-          <strong>Room slug:</strong> {viewState.slug}
-        </p>
+      <main style={callPageStyle}>
+        <section style={callHeaderStyle}>
+          <div>
+            <h1>LowTime</h1>
+            <p style={mutedParagraphStyle}>Room <code>{viewState.slug}</code></p>
+          </div>
+          <div style={callStatusBadgeStyle(callStatus)}>
+            {callStatus.replace("_", " ")}
+          </div>
+        </section>
         {callSession ? (
-          <section>
-            <h2>Call Connection</h2>
-            <p>
-              Joining as <strong>{callSession.displayName}</strong> with transport{" "}
-              <code>{callSession.transportPreference}</code>.
-            </p>
-            <p>
-              Requested media: audio <strong>{callSession.requestedMedia.audio ? "on" : "off"}</strong>, video{" "}
-              <strong>{callSession.requestedMedia.video ? "on" : "off"}</strong>.
-            </p>
-            <p>
-              Connection state: <strong>{callStatus}</strong>
-            </p>
-            {connectedSfuUrl ? (
-              <p>
-                Connected SFU URL: <code>{connectedSfuUrl}</code>
-              </p>
-            ) : null}
-            {callStatus === "connected" ? (
-              <p>
-                Live room connected with <strong>{callParticipants}</strong> participant(s) currently visible to the
-                client.
-              </p>
-            ) : null}
+          <section style={callLayoutStyle}>
+            <section style={remoteTileStyle}>
+              <div style={tileHeaderStyle}>
+                <h2 style={tileHeadingStyle}>Remote</h2>
+                <span>{remoteParticipantLabel}</span>
+              </div>
+              {remoteVideoTrack ? (
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  style={remoteVideoStyle}
+                />
+              ) : (
+                <div style={tilePlaceholderStyle}>
+                  <strong>{remoteParticipantLabel}</strong>
+                  <p style={mutedParagraphStyle}>
+                    {callStatus === "connected"
+                      ? "No remote camera is visible yet."
+                      : "Connecting the first call experience..."}
+                  </p>
+                </div>
+              )}
+            </section>
+            <aside style={selfViewPanelStyle}>
+              <div style={tileHeaderStyle}>
+                <h2 style={tileHeadingStyle}>You</h2>
+                <span>{callSession.displayName}</span>
+              </div>
+              {localVideoTrack && isCameraEnabled ? (
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  style={localVideoStyle}
+                />
+              ) : (
+                <div style={selfPlaceholderStyle}>
+                  <strong>{callSession.displayName}</strong>
+                  <p style={mutedParagraphStyle}>
+                    {isCameraEnabled ? "Camera is preparing..." : "Camera is off."}
+                  </p>
+                </div>
+              )}
+              <dl style={callFactsStyle}>
+                <div>
+                  <dt>Transport</dt>
+                  <dd><code>{callSession.transportPreference}</code></dd>
+                </div>
+                <div>
+                  <dt>Participants</dt>
+                  <dd>{callParticipants}</dd>
+                </div>
+                <div>
+                  <dt>Mic</dt>
+                  <dd>{isMicEnabled ? "On" : "Off"}</dd>
+                </div>
+                <div>
+                  <dt>Camera</dt>
+                  <dd>{isCameraEnabled ? "On" : "Off"}</dd>
+                </div>
+              </dl>
+              {connectedSfuUrl ? (
+                <p style={metaTextStyle}>
+                  SFU <code>{connectedSfuUrl}</code>
+                </p>
+              ) : null}
+            </aside>
+            <section style={controlsPanelStyle}>
+              <button
+                type="button"
+                onClick={() => void handleToggleMicrophone()}
+                disabled={callStatus !== "connected" || isTogglingMic}
+                style={secondaryControlStyle}
+              >
+                {isTogglingMic ? "Updating Mic..." : isMicEnabled ? "Mute" : "Unmute"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleToggleCamera()}
+                disabled={callStatus !== "connected" || isTogglingCamera}
+                style={secondaryControlStyle}
+              >
+                {isTogglingCamera ? "Updating Camera..." : isCameraEnabled ? "Turn Camera Off" : "Turn Camera On"}
+              </button>
+              <button type="button" onClick={handleLeaveCall} style={dangerControlStyle}>
+                Leave Call
+              </button>
+            </section>
             {callError ? <p role="alert">{callError}</p> : null}
-            <button type="button" onClick={handleLeaveCall}>
-              Leave Call
-            </button>
           </section>
         ) : (
           <>
@@ -494,4 +661,152 @@ export function App() {
 
 function toAbsoluteJoinUrl(joinUrl: string): string {
   return new URL(joinUrl, window.location.origin).toString();
+}
+
+const callPageStyle = {
+  display: "grid",
+  gap: "1rem",
+  padding: "1rem",
+  maxWidth: "72rem",
+  margin: "0 auto",
+} as const;
+
+const callHeaderStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "1rem",
+  flexWrap: "wrap",
+} as const;
+
+const callLayoutStyle = {
+  display: "grid",
+  gap: "1rem",
+} as const;
+
+const remoteTileStyle = {
+  minHeight: "20rem",
+  background: "#0f172a",
+  color: "#f8fafc",
+  borderRadius: "1rem",
+  padding: "1rem",
+  display: "grid",
+  gap: "1rem",
+} as const;
+
+const selfViewPanelStyle = {
+  background: "#e2e8f0",
+  borderRadius: "1rem",
+  padding: "1rem",
+  display: "grid",
+  gap: "1rem",
+} as const;
+
+const controlsPanelStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "0.75rem",
+} as const;
+
+const tileHeaderStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "1rem",
+} as const;
+
+const tileHeadingStyle = {
+  margin: 0,
+} as const;
+
+const tilePlaceholderStyle = {
+  minHeight: "16rem",
+  display: "grid",
+  placeItems: "center",
+  textAlign: "center",
+  border: "1px dashed rgba(255, 255, 255, 0.35)",
+  borderRadius: "0.75rem",
+  padding: "1rem",
+} as const;
+
+const selfPlaceholderStyle = {
+  minHeight: "12rem",
+  display: "grid",
+  placeItems: "center",
+  textAlign: "center",
+  background: "#cbd5e1",
+  borderRadius: "0.75rem",
+  padding: "1rem",
+} as const;
+
+const remoteVideoStyle = {
+  width: "100%",
+  minHeight: "16rem",
+  maxHeight: "32rem",
+  objectFit: "cover",
+  borderRadius: "0.75rem",
+  background: "#020617",
+} as const;
+
+const localVideoStyle = {
+  width: "100%",
+  maxWidth: "20rem",
+  aspectRatio: "4 / 3",
+  objectFit: "cover",
+  borderRadius: "0.75rem",
+  background: "#0f172a",
+} as const;
+
+const callFactsStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(8rem, 1fr))",
+  gap: "0.75rem",
+  margin: 0,
+} as const;
+
+const secondaryControlStyle = {
+  borderRadius: "999px",
+  padding: "0.75rem 1rem",
+  border: "1px solid #94a3b8",
+  background: "#f8fafc",
+  color: "#0f172a",
+} as const;
+
+const dangerControlStyle = {
+  borderRadius: "999px",
+  padding: "0.75rem 1rem",
+  border: "1px solid #ef4444",
+  background: "#ef4444",
+  color: "#fff",
+} as const;
+
+const mutedParagraphStyle = {
+  color: "#64748b",
+  margin: 0,
+} as const;
+
+const metaTextStyle = {
+  color: "#334155",
+  margin: 0,
+} as const;
+
+function callStatusBadgeStyle(callStatus: "idle" | "requesting_token" | "connecting" | "connected") {
+  return {
+    borderRadius: "999px",
+    padding: "0.5rem 0.75rem",
+    background:
+      callStatus === "connected"
+        ? "#dcfce7"
+        : callStatus === "idle"
+          ? "#e2e8f0"
+          : "#fef3c7",
+    color:
+      callStatus === "connected"
+        ? "#166534"
+        : callStatus === "idle"
+          ? "#334155"
+          : "#92400e",
+    fontWeight: 600,
+    textTransform: "capitalize" as const,
+  };
 }
