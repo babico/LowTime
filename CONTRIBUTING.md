@@ -13,6 +13,7 @@
 
 ## Branch And PR Conventions
 - Use short-lived feature branches named `feature/<topic>`, `fix/<topic>`, or `docs/<topic>`.
+- Push branches to GitHub before requesting review.
 - Keep pull requests scoped to one main concern.
 - Include a short summary, changed docs or ADRs, testing performed, and rollout or migration notes if needed.
 - Reference any impacted source-of-truth doc directly in the pull request description.
@@ -37,6 +38,8 @@
 ## Review Checklist
 - Confirm [TODO.md](TODO.md) reflects the current implementation status for the feature.
 - Confirm the change matches the product and architecture docs.
+- Confirm the branch has been pushed and the PR targets `main`.
+- Confirm review has been requested, including `@codex review` when that integration is available.
 - Confirm any new public contract is documented in [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md).
 - Confirm any lifecycle or persistence change is documented in [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md).
 - Confirm any operational change is reflected in [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md).

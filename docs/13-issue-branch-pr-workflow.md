@@ -54,6 +54,8 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - Avoid unrelated cleanup unless it is required for the issue.
 
 ## 6. Prepare The Pull Request
+- Push the branch to GitHub before opening the pull request.
+- Set upstream tracking on first push so follow-up pushes are simple.
 - Open the PR when the branch is reviewable, not only when it is perfect.
 - Keep the pull request scoped to one main concern.
 - The PR description should include:
@@ -65,7 +67,22 @@ LowTime should be built through small, traceable changes. Every meaningful code 
   - ADR changed or added, if applicable
   - rollout or migration notes, if applicable
 
-## 7. Pull Request Checklist
+## 7. Push And Open The Pull Request
+- Push the branch:
+  - `git push -u origin <branch-name>`
+- Open a PR against `main`.
+- Link the issue in the PR description.
+- Keep the PR title aligned with the branch scope and commit intent.
+- Because `main` is protected, normal feature work should land through PRs instead of direct pushes.
+
+## 8. Request Review
+- Ask for human review through the normal GitHub review flow.
+- If Codex GitHub review is enabled for the repository, add a PR comment:
+  - `@codex review`
+- Use the Codex review comment after the branch is pushed and the PR exists, so the bot can see the complete diff.
+- Treat bot review as additional feedback, not a replacement for checking docs, tests, and scope yourself.
+
+## 9. Pull Request Checklist
 - The branch addresses a real issue or clearly documented task.
 - The change matches the current product and architecture docs.
 - Tests were added or updated where needed.
@@ -75,13 +92,17 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - Data or lifecycle changes are reflected in [06-data-model-and-lifecycle.md](06-data-model-and-lifecycle.md).
 - Deployment-path changes are reflected in [02-system-architecture.md](02-system-architecture.md).
 - ADRs were updated if a long-lived design decision changed.
+- The branch has been pushed to GitHub.
+- The PR is open against `main`.
+- Review has been requested, including `@codex review` when that integration is available.
 
-## 8. Review Expectations
+## 10. Review Expectations
 - Reviewers should prioritize correctness, regressions, missing tests, and docs drift.
 - Authors should respond with follow-up commits instead of force-pushing away useful review history unless cleanup is explicitly needed.
 - If a reviewer finds a product or architecture mismatch, update the docs or revise the implementation before merge.
+- Bot comments should be triaged the same way as teammate comments: fix the problem, explain why it is safe, or document a follow-up.
 
-## 9. Merge And Follow-Up
+## 11. Merge And Follow-Up
 - Merge only after review comments are resolved and required checks pass.
 - After merge:
   - confirm `main` reflects the final docs state
@@ -95,12 +116,15 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 3. Create branch: `feature/room-create-api`.
 4. Implement endpoint, tests, and docs updates.
 5. Update [TODO.md](../TODO.md) to mark the feature `in_progress` and then `done`.
-6. Open PR with linked issue, summary, tests, and changed docs.
-7. Merge after review and close the issue.
+6. Push the branch to GitHub.
+7. Open PR with linked issue, summary, tests, and changed docs.
+8. Comment `@codex review` if the repository has Codex review enabled.
+9. Merge after review and close the issue.
 
 ## Failure Modes To Avoid
 - Coding without an issue or clear task owner.
 - Mixing unrelated features in one branch.
+- Forgetting to push the branch before asking for PR review.
 - Merging code without updating the matching docs.
 - Marking a feature `done` in [TODO.md](../TODO.md) before tests and docs are complete.
 - Changing architecture without an ADR.
