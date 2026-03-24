@@ -34,7 +34,7 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | Room creation endpoint and share link | `done` | Issue #4. Added room creation, host secret issuance, room metadata lookup, and a web share-link flow | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
-| Public join flow with display name | `planned` | No registration required | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+| Public join flow with display name | `done` | Issue #5. Added open-room admission, lobby waiting responses, and a no-registration join form on the room page | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Join screen with device preview | `planned` | Includes permission flow and preset selection | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | SFU integration for 1:1 rooms | `planned` | LiveKit is the default media path | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Basic in-call UI | `planned` | Remote tile, local self-view, leave/mute/camera controls | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
