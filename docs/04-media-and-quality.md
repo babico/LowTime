@@ -107,3 +107,4 @@ VideoPaused --> Healthy: network recovers and policy allows restore
 - Adaptation decisions should use both send-side and receive-side metrics.
 - Chat and signaling must continue even when media is degraded.
 - Media settings should be applied locally first and confirmed back through signaling only when necessary for room state or host policy.
+- Current implementation issues signed LiveKit room tokens from the API and connects the web client to the SFU for the 1:1 join path.

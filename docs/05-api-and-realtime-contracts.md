@@ -121,7 +121,10 @@ Response variants:
 {
   "transport": "sfu",
   "sfuUrl": "wss://media.lowtime.example",
-  "token": "signed-token"
+  "token": "signed-token",
+  "roomName": "7Qn2kP9Zx4Lm",
+  "participantIdentity": "sess_123",
+  "participantName": "Sam"
 }
 ```
 
@@ -136,6 +139,11 @@ Response variants:
   }
 }
 ```
+
+Current implementation notes:
+- `sessionId` must belong to an admitted room session before media credentials are issued.
+- The server currently supports `sfu` token issuance and returns a retryable error when SFU credentials are not configured.
+- The web client currently uses the SFU response to enter `/r/:slug/call` and establish the first end-to-end media connection.
 
 ## WebSocket Signaling
 - Endpoint: `WS /signal`

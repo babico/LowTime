@@ -71,3 +71,35 @@ export type JoinRoomResponse =
   | JoinRoomDirectResponse
   | JoinRoomWaitingResponse
   | JoinRoomDeniedResponse;
+
+export interface MediaTokenRequest {
+  sessionId: string;
+  transportPreference?: TransportPreference;
+}
+
+export interface SfuTokenResponse {
+  transport: "sfu";
+  sfuUrl: string;
+  token: string;
+  roomName: RoomSlug;
+  participantIdentity: string;
+  participantName: string;
+}
+
+export interface IceServerConfig {
+  urls: string[];
+  username?: string;
+  credential?: string;
+}
+
+export interface P2PSessionConfig {
+  offerRole: "caller" | "callee";
+  iceServers: IceServerConfig[];
+}
+
+export interface P2PTokenResponse {
+  transport: "p2p";
+  p2pSession: P2PSessionConfig;
+}
+
+export type MediaTokenResponse = SfuTokenResponse | P2PTokenResponse;

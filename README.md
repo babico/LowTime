@@ -20,7 +20,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - Monorepo scaffolding is in place for `apps/web`, `apps/server`, and `packages/shared`.
 - Docker Compose baseline is in place for local development and single-host deployment.
 - CI and linting baseline is in place for pull requests and pushes to `main`.
-- Room creation, share-link generation, and basic public join admission are in place for the first end-to-end calling flow.
+- Room creation, share-link generation, public join admission, and the first SFU-backed token handoff are in place for the core 1:1 flow.
 
 ## Planned Stack
 - Web client: React + TypeScript + PWA shell
@@ -58,6 +58,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 2. Start the baseline stack with `docker compose up --build`.
 3. Open the web app on `http://localhost:5173`.
 4. Check the server health endpoint on `http://localhost:3000/health`.
+5. Keep the default LiveKit values from `.env.example` unless you are pointing at a different SFU.
 
 ## Local Checks
 1. Install dependencies with `npm ci`.

@@ -14,7 +14,8 @@
   "dependencies": {
     "@fastify/cors": "^11.1.0",
     "fastify": "^5.2.1",
-    "@lowtime/shared": "^0.1.0"
+    "@lowtime/shared": "^0.1.0",
+    "livekit-server-sdk": "^2.13.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
