@@ -51,7 +51,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 6. Read the ADRs in [docs/adr/README.md](docs/adr/README.md) to understand why the major choices were made.
 
 ## Docker Quick Start
-1. Optionally copy `.env.example` to `.env` to override the default ports and service settings.
+1. Optionally copy `.env.example` to `.env` to override the default host ports and service settings.
 2. Start the baseline stack with `docker compose up --build`.
 3. Open the web app on `http://localhost:5173`.
 4. Check the server health endpoint on `http://localhost:3000/health`.

@@ -16,9 +16,9 @@ services:
       dockerfile: apps/server/Dockerfile
     environment:
       HOST: 0.0.0.0
-      PORT: ${SERVER_PORT:-3000}
-      DATABASE_URL: postgres://${POSTGRES_USER:-lowtime}:${POSTGRES_PASSWORD:-lowtime}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-lowtime}
-      REDIS_URL: redis://redis:${REDIS_PORT:-6379}
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-lowtime}:${POSTGRES_PASSWORD:-lowtime}@postgres:5432/${POSTGRES_DB:-lowtime}
+      REDIS_URL: redis://redis:6379
       LIVEKIT_URL: ${LIVEKIT_URL:-ws://livekit:7880}
     depends_on:
       - postgres
