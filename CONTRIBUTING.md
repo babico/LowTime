@@ -20,7 +20,7 @@
 - Use the GitHub issue and PR templates in `.github/` to keep issue and review context consistent.
 - The baseline CI workflow in `.github/workflows/ci.yml` runs lint, test, typecheck, and build checks on pull requests and pushes to `main`.
 - Issues default to assignee `babico`, and PRs are auto-routed to `babico` plus reviewer `codex` through the repository workflow.
-- The repository workflow also adds an `@codex review` comment automatically when a PR opens or receives new commits.
+- The repository workflow first checks whether the `codex` reviewer request succeeds and skips the `@codex review` comment when Codex reviewer access or review usage is unavailable.
 - Follow the full issue -> branch -> pull request process in [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md).
 
 ## Required Documentation Updates
@@ -44,7 +44,7 @@
 - Confirm the change matches the product and architecture docs.
 - Confirm the branch has been pushed and the PR targets `main`.
 - Confirm baseline CI checks pass unless the change is docs-only and intentionally bypasses application validation.
-- Confirm review has been requested, including `@codex review` when that integration is available.
+- Confirm review has been requested, including `@codex review` only when Codex reviewer access and review usage are available.
 - Confirm any new public contract is documented in [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md).
 - Confirm any lifecycle or persistence change is documented in [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md).
 - Confirm any operational change is reflected in [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md).
