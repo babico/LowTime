@@ -14,6 +14,16 @@ export interface ParticipantLike {
   trackPublications: Map<string, TrackPublicationLike>;
 }
 
+export function getPrimaryParticipant(participants: Iterable<unknown>): ParticipantLike | null {
+  for (const participant of participants) {
+    if (isParticipantLike(participant)) {
+      return participant;
+    }
+  }
+
+  return null;
+}
+
 export function getParticipantLabel(participant: Pick<ParticipantLike, "identity" | "name"> | null, fallback: string) {
   if (participant == null) {
     return fallback;
@@ -40,4 +50,13 @@ export function getFirstVideoTrack(participant: ParticipantLike | null): VideoTr
   }
 
   return null;
+}
+
+function isParticipantLike(value: unknown): value is ParticipantLike {
+  if (typeof value !== "object" || value == null) {
+    return false;
+  }
+
+  const candidate = value as Partial<ParticipantLike>;
+  return typeof candidate.identity === "string" && candidate.trackPublications instanceof Map;
 }

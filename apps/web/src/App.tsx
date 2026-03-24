@@ -9,7 +9,13 @@ import type {
   RoomSummary,
 } from "@lowtime/shared";
 
-import { getFirstVideoTrack, getParticipantLabel, type ParticipantLike, type VideoTrackLike } from "./call-experience.js";
+import {
+  getFirstVideoTrack,
+  getParticipantLabel,
+  getPrimaryParticipant,
+  type ParticipantLike,
+  type VideoTrackLike,
+} from "./call-experience.js";
 import { connectToSfu } from "./media-controller.js";
 import {
   buildRequestedMedia,
@@ -206,6 +212,7 @@ export function App() {
     const callSlug = viewState.slug;
     const activeCallSession = callSession;
     let cancelled = false;
+    let removeRoomListeners = () => {};
 
     async function connectCall() {
       setCallStatus("requesting_token");
@@ -252,13 +259,19 @@ export function App() {
         }
 
         const syncCallPresentation = () => {
-          const remoteParticipant = Array.from(room.remoteParticipants.values())[0] as ParticipantLike | undefined;
-          const nextRemoteParticipant = remoteParticipant ?? null;
+          const nextRemoteParticipant = getPrimaryParticipant(room.remoteParticipants.values());
 
           setCallParticipants(room.remoteParticipants.size + 1);
           setLocalVideoTrack(getFirstVideoTrack(room.localParticipant as unknown as ParticipantLike));
           setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
           setRemoteParticipantLabel(getParticipantLabel(nextRemoteParticipant, "Waiting for someone to join"));
+        };
+
+        const handleDisconnected = () => {
+          setCallStatus("idle");
+          setRemoteVideoTrack(null);
+          setLocalVideoTrack(null);
+          setRemoteParticipantLabel("Waiting for someone to join");
         };
 
         room.on("participantConnected", syncCallPresentation);
@@ -269,13 +282,19 @@ export function App() {
         room.on("trackUnmuted", syncCallPresentation);
         room.on("localTrackPublished", syncCallPresentation);
         room.on("localTrackUnpublished", syncCallPresentation);
+        room.on("disconnected", handleDisconnected);
 
-        room.on("disconnected", () => {
-          setCallStatus("idle");
-          setRemoteVideoTrack(null);
-          setLocalVideoTrack(null);
-          setRemoteParticipantLabel("Waiting for someone to join");
-        });
+        removeRoomListeners = () => {
+          room.off("participantConnected", syncCallPresentation);
+          room.off("participantDisconnected", syncCallPresentation);
+          room.off("trackSubscribed", syncCallPresentation);
+          room.off("trackUnsubscribed", syncCallPresentation);
+          room.off("trackMuted", syncCallPresentation);
+          room.off("trackUnmuted", syncCallPresentation);
+          room.off("localTrackPublished", syncCallPresentation);
+          room.off("localTrackUnpublished", syncCallPresentation);
+          room.off("disconnected", handleDisconnected);
+        };
 
         callRoomRef.current?.disconnect();
         callRoomRef.current = room;
@@ -294,6 +313,7 @@ export function App() {
 
     return () => {
       cancelled = true;
+      removeRoomListeners();
       callRoomRef.current?.disconnect();
       callRoomRef.current = null;
     };
@@ -436,9 +456,8 @@ export function App() {
     try {
       await callRoomRef.current.localParticipant.setCameraEnabled(nextValue);
       setIsCameraEnabled(nextValue);
-      setLocalVideoTrack(
-        nextValue ? getFirstVideoTrack(callRoomRef.current.localParticipant as unknown as ParticipantLike) : null,
-      );
+      const nextLocalParticipant = callRoomRef.current.localParticipant as unknown as ParticipantLike;
+      setLocalVideoTrack(nextValue ? getFirstVideoTrack(nextLocalParticipant) : null);
     } catch (error) {
       setCallError(error instanceof Error ? error.message : "Unable to update camera state");
     } finally {

@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getFirstVideoTrack, getParticipantLabel, type ParticipantLike, type VideoTrackLike } from "./call-experience.js";
+import {
+  getFirstVideoTrack,
+  getParticipantLabel,
+  getPrimaryParticipant,
+  type ParticipantLike,
+  type VideoTrackLike,
+} from "./call-experience.js";
 
 function createTrack(kind: string): VideoTrackLike {
   return {
@@ -44,4 +50,15 @@ test("getFirstVideoTrack returns null when no video track is present", () => {
   };
 
   assert.equal(getFirstVideoTrack(participant), null);
+});
+
+test("getPrimaryParticipant returns the first participant-like entry", () => {
+  const participant: ParticipantLike = {
+    identity: "sess_1",
+    name: "Sam",
+    trackPublications: new Map(),
+  };
+
+  assert.equal(getPrimaryParticipant([null, { nope: true }, participant]), participant);
+  assert.equal(getPrimaryParticipant([null, { nope: true }]), null);
 });
