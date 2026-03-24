@@ -18,7 +18,7 @@
 - Include a short summary, changed docs or ADRs, testing performed, and rollout or migration notes if needed.
 - Reference any impacted source-of-truth doc directly in the pull request description.
 - Use the GitHub issue and PR templates in `.github/` to keep issue and review context consistent.
-- The baseline CI workflow in `.github/workflows/ci.yml` runs lint, typecheck, and build checks on pull requests and pushes to `main`.
+- The baseline CI workflow in `.github/workflows/ci.yml` runs lint, test, typecheck, and build checks on pull requests and pushes to `main`.
 - Issues default to assignee `babico`, and PRs are auto-routed to `babico` plus reviewer `codex` through the repository workflow.
 - The repository workflow also adds an `@codex review` comment automatically when a PR opens or receives new commits.
 - Follow the full issue -> branch -> pull request process in [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md).

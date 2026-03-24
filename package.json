@@ -10,10 +10,11 @@
   ],
   "scripts": {
     "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "check": "npm run lint && npm run typecheck",
-    "ci": "npm run check && npm run build"
+    "ci": "npm run check && npm run test && npm run build"
   },
   "engines": {
     "node": ">=20.19.0"

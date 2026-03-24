@@ -20,6 +20,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - Monorepo scaffolding is in place for `apps/web`, `apps/server`, and `packages/shared`.
 - Docker Compose baseline is in place for local development and single-host deployment.
 - CI and linting baseline is in place for pull requests and pushes to `main`.
+- Room creation and share-link generation are in place for the first backend-to-frontend product flow.
 
 ## Planned Stack
 - Web client: React + TypeScript + PWA shell
@@ -36,7 +37,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - `TODO.md`: living implementation tracker
 - `CONTRIBUTING.md`: workflow and documentation rules
 - `.github/`: GitHub issue templates, PR template, and workflow automation
-- `.github/workflows/ci.yml`: baseline GitHub Actions checks for lint, typecheck, and build
+- `.github/workflows/ci.yml`: baseline GitHub Actions checks for lint, test, typecheck, and build
 - `docker-compose.yml`: default local and single-host container stack
 - `.env.example`: baseline environment contract for Docker-based runs
 - `apps/`: application packages for the web client and backend server
@@ -61,7 +62,8 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 ## Local Checks
 1. Install dependencies with `npm ci`.
 2. Run `npm run check` for linting and typechecking.
-3. Run `npm run build` before opening a PR when your change affects application code.
+3. Run `npm run test` for automated coverage on implemented backend flows.
+4. Run `npm run build` before opening a PR when your change affects application code.
 
 ## Documentation Index
 - Product: [docs/01-product-overview.md](docs/01-product-overview.md)
