@@ -95,7 +95,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         joinUrl: `/r/${room.slug}`,
         hostSecret: room.hostSecret,
         expiresAt: room.expiresAt,
-        room: toRoomSummary(room),
+        room: toRoomSummary(room, now()),
       };
     },
   );
@@ -112,7 +112,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         };
       }
 
-      return toRoomSummary(room);
+      return toRoomSummary(room, now());
     },
   );
 
@@ -137,7 +137,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         };
       }
 
-      if (room.status === "expired" || room.status === "closed") {
+      const roomStatus = getRoomStatus(room, now());
+
+      if (roomStatus === "expired" || roomStatus === "closed") {
         return {
           joinState: "denied",
           reason: "room_expired",
@@ -319,16 +321,28 @@ function validateJoinRoomRequest(input: JoinRoomRequest): {
   };
 }
 
-function toRoomSummary(room: StoredRoom): RoomSummary {
+function toRoomSummary(room: StoredRoom, now = new Date()): RoomSummary {
   return {
     slug: room.slug,
     accessMode: room.accessMode,
     maxParticipants: room.maxParticipants,
     qualityCap: room.qualityCap,
     allowScreenShare: room.allowScreenShare,
-    status: room.status,
+    status: getRoomStatus(room, now),
     expiresAt: room.expiresAt,
   };
+}
+
+function getRoomStatus(room: StoredRoom, now: Date): RoomSummary["status"] {
+  if (room.status === "closed") {
+    return "closed";
+  }
+
+  if (new Date(room.expiresAt).getTime() <= now.getTime()) {
+    return "expired";
+  }
+
+  return room.status;
 }
 
 function createSlug(): RoomSlug {
