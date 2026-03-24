@@ -17,7 +17,7 @@ The delivery plan prioritizes the smallest viable real-time path first, then lay
   - docs package accepted
   - package layout chosen
   - container baseline defined for web, server, postgres, redis, and coturn
-  - CI and linting baseline defined
+  - CI and linting baseline implemented
 
 ## Phase 1: Core 1:1 Calling
 - Build room creation and public join flow.

@@ -19,6 +19,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - The product, system, and delivery decisions are captured in `docs/`.
 - Monorepo scaffolding is in place for `apps/web`, `apps/server`, and `packages/shared`.
 - Docker Compose baseline is in place for local development and single-host deployment.
+- CI and linting baseline is in place for pull requests and pushes to `main`.
 
 ## Planned Stack
 - Web client: React + TypeScript + PWA shell
@@ -35,6 +36,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - `TODO.md`: living implementation tracker
 - `CONTRIBUTING.md`: workflow and documentation rules
 - `.github/`: GitHub issue templates, PR template, and workflow automation
+- `.github/workflows/ci.yml`: baseline GitHub Actions checks for lint, typecheck, and build
 - `docker-compose.yml`: default local and single-host container stack
 - `.env.example`: baseline environment contract for Docker-based runs
 - `apps/`: application packages for the web client and backend server
@@ -56,6 +58,11 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 3. Open the web app on `http://localhost:5173`.
 4. Check the server health endpoint on `http://localhost:3000/health`.
 
+## Local Checks
+1. Install dependencies with `npm ci`.
+2. Run `npm run check` for linting and typechecking.
+3. Run `npm run build` before opening a PR when your change affects application code.
+
 ## Documentation Index
 - Product: [docs/01-product-overview.md](docs/01-product-overview.md)
 - Architecture: [docs/02-system-architecture.md](docs/02-system-architecture.md)
@@ -72,5 +79,6 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - Contribution workflow: [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md)
 - Implementation tracker: [TODO.md](TODO.md)
 - GitHub templates and routing: `.github/`
+- CI workflow: `.github/workflows/ci.yml`
 - Docker baseline: `docker-compose.yml`, `.env.example`, `apps/web/Dockerfile`, `apps/server/Dockerfile`
 - Decisions: [docs/adr/README.md](docs/adr/README.md)

@@ -27,7 +27,7 @@
 | Documentation | Contribution and ADR workflow | `done` | Contributor rules and ADR policy documented | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Tooling | Monorepo scaffolding | `done` | Issue #1. Added root workspace files plus `apps/web`, `apps/server`, and `packages/shared` scaffolds | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
 | Tooling | Dockerfiles and Compose baseline | `done` | Issue #2. Added Dockerfiles for web and server, root compose stack, and baseline env contract | [docs/adr/ADR-006-docker-first-deployment.md](docs/adr/ADR-006-docker-first-deployment.md) |
-| Tooling | CI and linting baseline | `planned` | Add repo checks before feature work grows | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
+| Tooling | CI and linting baseline | `done` | Issue #3. Added workspace lint and typecheck scripts plus a GitHub Actions workflow for PR and main-branch checks | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
 
 ## Phase 1: Core 1:1 Calling
 
