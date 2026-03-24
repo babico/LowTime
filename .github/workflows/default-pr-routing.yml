@@ -32,6 +32,8 @@ jobs:
               assignees: ["babico"],
             });
 
+            let codexReviewAvailable = false;
+
             try {
               await github.rest.pulls.requestReviewers({
                 owner,
@@ -39,8 +41,15 @@ jobs:
                 pull_number,
                 reviewers: ["codex"],
               });
+
+              codexReviewAvailable = true;
             } catch (error) {
               core.warning(`Could not request codex reviewer automatically: ${error.message}`);
+            }
+
+            if (!codexReviewAvailable) {
+              core.warning("Skipping @codex review comment because Codex reviewer access or usage is not available.");
+              return;
             }
 
             await github.rest.issues.createComment({

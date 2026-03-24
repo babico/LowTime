@@ -84,7 +84,11 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - Ask for human review through the normal GitHub review flow.
 - PRs are automatically assigned to `babico` by the repository workflow.
 - PRs automatically request `codex` as a reviewer through the repository workflow when GitHub accepts that reviewer account.
-- The repository workflow also posts `@codex review` automatically when a PR is opened, reopened, marked ready, or updated with new commits.
+- Add a review-availability check before relying on Codex automation:
+  - confirm the repo can request the `codex` reviewer
+  - confirm Codex review usage is available for the connected account or organization
+  - abort the Codex-specific step if that access or usage is unavailable
+- The repository workflow posts `@codex review` automatically only after the `codex` reviewer request succeeds when a PR is opened, reopened, marked ready, or updated with new commits.
 - A manual `@codex review` comment is still useful when you want to retrigger review outside those workflow events.
 - Treat bot review as additional feedback, not a replacement for checking docs, tests, and scope yourself.
 
@@ -100,7 +104,7 @@ LowTime should be built through small, traceable changes. Every meaningful code 
 - ADRs were updated if a long-lived design decision changed.
 - The branch has been pushed to GitHub.
 - The PR is open against `main`.
-- Review has been requested, including the automatic or manual `@codex review` trigger when that integration is available.
+- Review has been requested, including the automatic or manual `@codex review` trigger only when Codex reviewer access and review usage are available.
 
 ## 10. Review Expectations
 - Reviewers should prioritize correctness, regressions, missing tests, and docs drift.
