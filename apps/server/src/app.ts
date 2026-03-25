@@ -8,6 +8,8 @@ import type {
   CreateRoomResponse,
   JoinRoomRequest,
   JoinRoomResponse,
+  LobbyRequestStatusResponse,
+  LobbyRequestSummary,
   MediaTokenRequest,
   MediaTokenResponse,
   QualityCap,
@@ -30,6 +32,7 @@ const QUALITY_CAPS: QualityCap[] = ["low", "balanced", "high"];
 interface StoredRoom extends RoomSummary {
   hostSecret: string;
   sessions: StoredSession[];
+  lobbyRequests: StoredLobbyRequest[];
 }
 
 interface CreateStoredRoomInput {
@@ -45,10 +48,25 @@ interface StoredSession {
   displayName: string;
 }
 
+interface StoredLobbyRequest {
+  id: string;
+  displayName: string;
+  createdAt: string;
+  status: "waiting" | "approved" | "denied";
+  sessionId?: string;
+  transportPreference?: TransportPreference;
+  denialReason?: "host_denied" | "room_expired" | "room_closed";
+}
+
 export interface RoomStore {
   createRoom(input: CreateStoredRoomInput): StoredRoom;
   getRoom(slug: RoomSlug): StoredRoom | undefined;
   createSession(roomSlug: RoomSlug, displayName: string): StoredSession | undefined;
+  createLobbyRequest(roomSlug: RoomSlug, displayName: string, createdAt: string): StoredLobbyRequest | undefined;
+  listLobbyRequests(roomSlug: RoomSlug): StoredLobbyRequest[];
+  getLobbyRequest(roomSlug: RoomSlug, requestId: string): StoredLobbyRequest | undefined;
+  approveLobbyRequest(roomSlug: RoomSlug, requestId: string): StoredLobbyRequest | undefined;
+  denyLobbyRequest(roomSlug: RoomSlug, requestId: string, reason: "host_denied" | "room_expired" | "room_closed"): StoredLobbyRequest | undefined;
 }
 
 export interface BuildAppOptions {
@@ -168,9 +186,18 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       }
 
       if (room.accessMode === "lobby") {
+        const lobbyRequest = roomStore.createLobbyRequest(room.slug, validation.value.displayName, now().toISOString());
+
+        if (lobbyRequest == null) {
+          return {
+            joinState: "denied",
+            reason: "room_full",
+          };
+        }
+
         return {
           joinState: "waiting",
-          requestId: createRequestId(),
+          requestId: lobbyRequest.id,
         };
       }
 
@@ -189,6 +216,148 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         joinState: "direct",
         sessionId: session.id,
         transportPreference: "sfu",
+      };
+    },
+  );
+
+  app.get<{ Params: { slug: string }; Headers: { "x-host-secret"?: string }; Reply: { requests: LobbyRequestSummary[] } | { message: string } }>(
+    "/api/rooms/:slug/lobby",
+    async (request, reply) => {
+      const room = roomStore.getRoom(request.params.slug);
+
+      if (room == null) {
+        reply.code(404);
+        return { message: "Room not found" };
+      }
+
+      if (!hasValidHostSecret(room, request.headers["x-host-secret"])) {
+        reply.code(403);
+        return { message: "Host secret is required" };
+      }
+
+      return {
+        requests: roomStore.listLobbyRequests(room.slug).map((entry) => ({
+          requestId: entry.id,
+          displayName: entry.displayName,
+          createdAt: entry.createdAt,
+        })),
+      };
+    },
+  );
+
+  app.get<{ Params: { slug: string; requestId: string }; Reply: LobbyRequestStatusResponse | { message: string } }>(
+    "/api/rooms/:slug/lobby/:requestId",
+    async (request, reply) => {
+      const room = roomStore.getRoom(request.params.slug);
+
+      if (room == null) {
+        reply.code(404);
+        return { message: "Room not found" };
+      }
+
+      const lobbyRequest = roomStore.getLobbyRequest(room.slug, request.params.requestId);
+
+      if (lobbyRequest == null) {
+        reply.code(404);
+        return { message: "Lobby request not found" };
+      }
+
+      const roomStatus = getRoomStatus(room, now());
+
+      if (roomStatus === "expired") {
+        roomStore.denyLobbyRequest(room.slug, lobbyRequest.id, "room_expired");
+        return { status: "denied", reason: "room_expired" };
+      }
+
+      if (roomStatus === "closed") {
+        roomStore.denyLobbyRequest(room.slug, lobbyRequest.id, "room_closed");
+        return { status: "denied", reason: "room_closed" };
+      }
+
+      if (lobbyRequest.status === "approved" && lobbyRequest.sessionId != null && lobbyRequest.transportPreference != null) {
+        return {
+          status: "approved",
+          sessionId: lobbyRequest.sessionId,
+          transportPreference: lobbyRequest.transportPreference,
+        };
+      }
+
+      if (lobbyRequest.status === "denied") {
+        return {
+          status: "denied",
+          reason: lobbyRequest.denialReason ?? "host_denied",
+        };
+      }
+
+      return {
+        status: "waiting",
+      };
+    },
+  );
+
+  app.post<{ Params: { slug: string; requestId: string }; Headers: { "x-host-secret"?: string }; Reply: LobbyRequestStatusResponse | { message: string } }>(
+    "/api/rooms/:slug/lobby/:requestId/approve",
+    async (request, reply) => {
+      const room = roomStore.getRoom(request.params.slug);
+
+      if (room == null) {
+        reply.code(404);
+        return { message: "Room not found" };
+      }
+
+      if (!hasValidHostSecret(room, request.headers["x-host-secret"])) {
+        reply.code(403);
+        return { message: "Host secret is required" };
+      }
+
+      const roomStatus = getRoomStatus(room, now());
+      if (roomStatus === "expired" || roomStatus === "closed") {
+        reply.code(409);
+        return { message: "Room is no longer available" };
+      }
+
+      const lobbyRequest = roomStore.approveLobbyRequest(room.slug, request.params.requestId);
+
+      if (lobbyRequest == null || lobbyRequest.sessionId == null || lobbyRequest.transportPreference == null) {
+        reply.code(404);
+        return { message: "Lobby request not found" };
+      }
+
+      room.status = "active";
+
+      return {
+        status: "approved",
+        sessionId: lobbyRequest.sessionId,
+        transportPreference: lobbyRequest.transportPreference,
+      };
+    },
+  );
+
+  app.post<{ Params: { slug: string; requestId: string }; Headers: { "x-host-secret"?: string }; Reply: LobbyRequestStatusResponse | { message: string } }>(
+    "/api/rooms/:slug/lobby/:requestId/deny",
+    async (request, reply) => {
+      const room = roomStore.getRoom(request.params.slug);
+
+      if (room == null) {
+        reply.code(404);
+        return { message: "Room not found" };
+      }
+
+      if (!hasValidHostSecret(room, request.headers["x-host-secret"])) {
+        reply.code(403);
+        return { message: "Host secret is required" };
+      }
+
+      const lobbyRequest = roomStore.denyLobbyRequest(room.slug, request.params.requestId, "host_denied");
+
+      if (lobbyRequest == null) {
+        reply.code(404);
+        return { message: "Lobby request not found" };
+      }
+
+      return {
+        status: "denied",
+        reason: "host_denied",
       };
     },
   );
@@ -278,6 +447,7 @@ export function createInMemoryRoomStore(): RoomStore {
         expiresAt: input.expiresAt,
         hostSecret: createHostSecret(),
         sessions: [],
+        lobbyRequests: [],
       };
 
       rooms.set(slug, room);
@@ -303,7 +473,67 @@ export function createInMemoryRoomStore(): RoomStore {
 
       return session;
     },
+    createLobbyRequest(roomSlug, displayName, createdAt) {
+      const room = rooms.get(roomSlug);
+
+      if (room == null || room.sessions.length + room.lobbyRequests.filter((entry) => entry.status === "waiting").length >= room.maxParticipants) {
+        return undefined;
+      }
+
+      const request: StoredLobbyRequest = {
+        id: createRequestId(),
+        displayName,
+        createdAt,
+        status: "waiting",
+      };
+
+      room.lobbyRequests.push(request);
+      return request;
+    },
+    listLobbyRequests(roomSlug) {
+      const room = rooms.get(roomSlug);
+      if (room == null) {
+        return [];
+      }
+
+      return room.lobbyRequests.filter((entry) => entry.status === "waiting");
+    },
+    getLobbyRequest(roomSlug, requestId) {
+      return rooms.get(roomSlug)?.lobbyRequests.find((entry) => entry.id === requestId);
+    },
+    approveLobbyRequest(roomSlug, requestId) {
+      const room = rooms.get(roomSlug);
+      const request = room?.lobbyRequests.find((entry) => entry.id === requestId);
+
+      if (room == null || request == null || request.status !== "waiting" || room.sessions.length >= room.maxParticipants) {
+        return undefined;
+      }
+
+      const session = this.createSession(roomSlug, request.displayName);
+      if (session == null) {
+        return undefined;
+      }
+
+      request.status = "approved";
+      request.sessionId = session.id;
+      request.transportPreference = "sfu";
+      return request;
+    },
+    denyLobbyRequest(roomSlug, requestId, reason) {
+      const request = rooms.get(roomSlug)?.lobbyRequests.find((entry) => entry.id === requestId);
+      if (request == null) {
+        return undefined;
+      }
+
+      request.status = "denied";
+      request.denialReason = reason;
+      return request;
+    },
   };
+}
+
+function hasValidHostSecret(room: StoredRoom, hostSecret: string | undefined): boolean {
+  return hostSecret != null && hostSecret === room.hostSecret;
 }
 
 function validateCreateRoomRequest(input: CreateRoomRequest): {

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   CreateRoomResponse,
   JoinRoomResponse,
+  LobbyRequestStatusResponse,
+  LobbyRequestSummary,
   MediaTokenResponse,
   QualityPreset,
   RequestedMedia,
@@ -34,11 +36,18 @@ import {
 import {
   buildRequestedMedia,
   clearStoredCallSession,
+  clearStoredLobbyRequest,
   getApiBaseUrl,
   getCallRoute,
   getViewState,
+  getWaitingRoute,
+  loadStoredHostSecret,
+  loadStoredLobbyRequest,
   loadStoredCallSession,
+  saveStoredHostSecret,
+  saveStoredLobbyRequest,
   saveStoredCallSession,
+  type StoredLobbyRequest,
   type StoredCallSession,
 } from "./room-entry.js";
 
@@ -67,6 +76,11 @@ export function App() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
   const [isJoining, setIsJoining] = useState(false);
+  const [hostLobbyRequests, setHostLobbyRequests] = useState<LobbyRequestSummary[]>([]);
+  const [hostLobbyError, setHostLobbyError] = useState<string | null>(null);
+  const [waitingRequest, setWaitingRequest] = useState<StoredLobbyRequest | null>(null);
+  const [waitingStatus, setWaitingStatus] = useState<LobbyRequestStatusResponse | null>(null);
+  const [waitingError, setWaitingError] = useState<string | null>(null);
 
   const [callSession, setCallSession] = useState<StoredCallSession | null>(null);
   const [callStatus, setCallStatus] = useState<"idle" | "requesting_token" | "connecting" | "connected">("idle");
@@ -90,6 +104,10 @@ export function App() {
   const [installMessage, setInstallMessage] = useState<string | null>(null);
   const [isInstallingApp, setIsInstallingApp] = useState(false);
   const [isStandaloneApp, setIsStandaloneApp] = useState(() => getStandaloneAppState());
+  const hostSecret = useMemo(
+    () => (viewState.kind === "home" ? null : loadStoredHostSecret(window.localStorage, viewState.slug)),
+    [viewState],
+  );
 
   const apiBaseUrl = useMemo(
     () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
@@ -158,7 +176,7 @@ export function App() {
   }, [callStatus]);
 
   useEffect(() => {
-    if (viewState.kind === "room") {
+    if (viewState.kind === "room" || viewState.kind === "waiting") {
       return;
     }
 
@@ -173,6 +191,11 @@ export function App() {
     setPreviewState("idle");
     setPreviewError(null);
     setIsLoadingRoom(false);
+    setHostLobbyRequests([]);
+    setHostLobbyError(null);
+    setWaitingRequest(null);
+    setWaitingStatus(null);
+    setWaitingError(null);
     stopMediaStream(previewStreamRef.current);
     previewStreamRef.current = null;
   }, [viewState]);
@@ -195,7 +218,7 @@ export function App() {
   }, [previewState, previewVideoEnabled]);
 
   useEffect(() => {
-    if (viewState.kind !== "room") {
+    if (viewState.kind !== "room" && viewState.kind !== "waiting") {
       return;
     }
 
@@ -240,6 +263,128 @@ export function App() {
       abortController.abort();
     };
   }, [apiBaseUrl, viewState]);
+
+  useEffect(() => {
+    if (viewState.kind !== "waiting") {
+      return;
+    }
+
+    const storedRequest = loadStoredLobbyRequest(window.sessionStorage, viewState.slug);
+
+    if (storedRequest == null || storedRequest.requestId !== viewState.requestId) {
+      setWaitingRequest(null);
+      setWaitingStatus(null);
+      setWaitingError("Missing waiting-room session. Rejoin from the room page.");
+      return;
+    }
+
+    setWaitingRequest(storedRequest);
+    setWaitingError(null);
+
+    let cancelled = false;
+    let timerId: number | undefined;
+
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/lobby/${viewState.requestId}`);
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { message?: string };
+          throw new Error(payload.message ?? "Unable to load waiting-room status");
+        }
+
+        const payload = (await response.json()) as LobbyRequestStatusResponse;
+
+        if (cancelled) {
+          return;
+        }
+
+        setWaitingStatus(payload);
+
+        if (payload.status === "approved") {
+          saveStoredCallSession(window.sessionStorage, viewState.slug, {
+            sessionId: payload.sessionId,
+            displayName: storedRequest.displayName,
+            qualityPreset: storedRequest.qualityPreset,
+            transportPreference: payload.transportPreference,
+            requestedMedia: storedRequest.requestedMedia,
+          });
+          clearStoredLobbyRequest(window.sessionStorage, viewState.slug);
+          window.history.pushState({}, "", getCallRoute(viewState.slug));
+          setViewState(getViewState(window.location.pathname));
+          return;
+        }
+
+        if (payload.status === "waiting") {
+          timerId = window.setTimeout(() => {
+            void pollStatus();
+          }, 3000);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWaitingError(error instanceof Error ? error.message : "Unable to load waiting-room status");
+        }
+      }
+    };
+
+    void pollStatus();
+
+    return () => {
+      cancelled = true;
+      if (timerId != null) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [apiBaseUrl, viewState]);
+
+  useEffect(() => {
+    if (viewState.kind !== "room" || roomSummary?.accessMode !== "lobby" || hostSecret == null) {
+      setHostLobbyRequests([]);
+      setHostLobbyError(null);
+      return;
+    }
+
+    let cancelled = false;
+    let timerId: number | undefined;
+
+    const loadLobbyRequests = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/lobby`, {
+          headers: {
+            "x-host-secret": hostSecret,
+          },
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { message?: string };
+          throw new Error(payload.message ?? "Unable to load lobby requests");
+        }
+
+        const payload = (await response.json()) as { requests: LobbyRequestSummary[] };
+
+        if (!cancelled) {
+          setHostLobbyRequests(payload.requests);
+          setHostLobbyError(null);
+          timerId = window.setTimeout(() => {
+            void loadLobbyRequests();
+          }, 3000);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setHostLobbyError(error instanceof Error ? error.message : "Unable to load lobby requests");
+        }
+      }
+    };
+
+    void loadLobbyRequests();
+
+    return () => {
+      cancelled = true;
+      if (timerId != null) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [apiBaseUrl, hostSecret, roomSummary?.accessMode, viewState]);
 
   useEffect(() => {
     if (viewState.kind !== "call") {
@@ -441,6 +586,7 @@ export function App() {
 
       const payload = (await response.json()) as CreateRoomResponse;
       setCreateResult(payload);
+      saveStoredHostSecret(window.localStorage, payload.roomSlug, payload.hostSecret);
     } catch (error) {
       setCreateResult(null);
       setCreateError(error instanceof Error ? error.message : "Unable to create room");
@@ -528,6 +674,17 @@ export function App() {
         stopMediaStream(previewStreamRef.current);
         previewStreamRef.current = null;
         window.history.pushState({}, "", getCallRoute(viewState.slug));
+        setViewState(getViewState(window.location.pathname));
+      } else if (payload.joinState === "waiting") {
+        const storedRequest: StoredLobbyRequest = {
+          requestId: payload.requestId,
+          displayName: displayName.trim(),
+          qualityPreset: selectedQualityPreset,
+          requestedMedia: buildRequestedMedia(previewAudioEnabled, previewVideoEnabled),
+        };
+
+        saveStoredLobbyRequest(window.sessionStorage, viewState.slug, storedRequest);
+        window.history.pushState({}, "", getWaitingRoute(viewState.slug, payload.requestId));
         setViewState(getViewState(window.location.pathname));
       }
     } catch (error) {
@@ -619,6 +776,32 @@ export function App() {
         setPreviewState("error");
         setPreviewError(error instanceof Error ? error.message : "Unable to start device preview.");
       }
+    }
+  }
+
+  async function handleHostLobbyAction(requestId: string, action: "approve" | "deny") {
+    if (viewState.kind !== "room" || hostSecret == null) {
+      return;
+    }
+
+    setHostLobbyError(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/lobby/${requestId}/${action}`, {
+        method: "POST",
+        headers: {
+          "x-host-secret": hostSecret,
+        },
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message ?? `Unable to ${action} lobby request`);
+      }
+
+      setHostLobbyRequests((current) => current.filter((entry) => entry.requestId !== requestId));
+    } catch (error) {
+      setHostLobbyError(error instanceof Error ? error.message : `Unable to ${action} lobby request`);
     }
   }
 
@@ -750,6 +933,58 @@ export function App() {
     );
   }
 
+  if (viewState.kind === "waiting") {
+    return (
+      <main style={callPageStyle}>
+        <section style={previewCardStyle}>
+          <h1>Waiting For Host Approval</h1>
+          <p style={mutedParagraphStyle}>
+            Room <code>{viewState.slug}</code> is using lobby mode. We&apos;ll move you into the call as soon as the host approves your request.
+          </p>
+          {waitingRequest ? (
+            <dl style={callFactsStyle}>
+              <div>
+                <dt>Name</dt>
+                <dd>{waitingRequest.displayName}</dd>
+              </div>
+              <div>
+                <dt>Preset</dt>
+                <dd>{getQualityPresetLabel(waitingRequest.qualityPreset)}</dd>
+              </div>
+              <div>
+                <dt>Mic</dt>
+                <dd>{waitingRequest.requestedMedia.audio ? "On" : "Off"}</dd>
+              </div>
+              <div>
+                <dt>Camera</dt>
+                <dd>{waitingRequest.requestedMedia.video ? "On" : "Off"}</dd>
+              </div>
+            </dl>
+          ) : null}
+          {waitingStatus?.status === "waiting" || waitingStatus == null ? (
+            <p>Approval is still pending.</p>
+          ) : null}
+          {waitingStatus?.status === "denied" ? (
+            <p role="alert">
+              Host denied this request: <strong>{waitingStatus.reason}</strong>
+            </p>
+          ) : null}
+          {waitingError ? <p role="alert">{waitingError}</p> : null}
+          <button
+            type="button"
+            onClick={() => {
+              clearStoredLobbyRequest(window.sessionStorage, viewState.slug);
+              window.history.pushState({}, "", `/r/${viewState.slug}`);
+              setViewState(getViewState(window.location.pathname));
+            }}
+          >
+            Back To Join Screen
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   if (viewState.kind === "room") {
     return (
       <main>
@@ -859,6 +1094,39 @@ export function App() {
                 </p>
               ) : null}
             </section>
+            {roomSummary.accessMode === "lobby" && hostSecret ? (
+              <section style={previewCardStyle}>
+                <div style={tileHeaderStyle}>
+                  <h2 style={tileHeadingStyle}>Host Lobby Queue</h2>
+                  <span>{hostLobbyRequests.length} pending</span>
+                </div>
+                {hostLobbyRequests.length === 0 ? (
+                  <p style={mutedParagraphStyle}>No one is waiting right now.</p>
+                ) : (
+                  <div style={hostQueueStyle}>
+                    {hostLobbyRequests.map((request) => (
+                      <article key={request.requestId} style={hostQueueItemStyle}>
+                        <div>
+                          <strong>{request.displayName}</strong>
+                          <p style={mutedParagraphStyle}>
+                            Requested at {new Date(request.createdAt).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <div style={controlsPanelStyle}>
+                          <button type="button" onClick={() => void handleHostLobbyAction(request.requestId, "approve")}>
+                            Approve
+                          </button>
+                          <button type="button" onClick={() => void handleHostLobbyAction(request.requestId, "deny")}>
+                            Deny
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {hostLobbyError ? <p role="alert">{hostLobbyError}</p> : null}
+              </section>
+            ) : null}
           </>
         ) : null}
       </main>
@@ -994,6 +1262,22 @@ const previewVideoStyle = {
 const previewOptionsStyle = {
   display: "grid",
   gap: "0.75rem",
+} as const;
+
+const hostQueueStyle = {
+  display: "grid",
+  gap: "0.75rem",
+} as const;
+
+const hostQueueItemStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "1rem",
+  flexWrap: "wrap",
+  padding: "0.75rem 1rem",
+  borderRadius: "0.75rem",
+  background: "#f8fafc",
 } as const;
 
 const toggleOptionStyle = {

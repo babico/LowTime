@@ -45,7 +45,7 @@
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| Lobby mode | `planned` | Waiting room plus host approval | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+| Lobby mode | `done` | Issue #11. Added pending lobby requests, host approval and denial endpoints, a waiting route, and host-side queue controls in the room screen | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Passcode-protected rooms | `planned` | Validate before token issuance | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
 | Host reclaim after refresh | `planned` | Restore host role from host secret | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Reconnect window and session recovery | `planned` | Preserve identity during short disconnects | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
