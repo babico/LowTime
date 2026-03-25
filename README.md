@@ -3,7 +3,7 @@
 - Purpose: Provide a short project entry point, explain the product, and route contributors to the correct detailed docs.
 - Audience: New engineers, product collaborators, designers, and operators.
 - Status: Baseline
-- Last Updated: 2026-03-24
+- Last Updated: 2026-03-25
 - Related Docs: [Contributing](CONTRIBUTING.md), [Docs Map](docs/00-docs-map.md), [Product Overview](docs/01-product-overview.md), [System Architecture](docs/02-system-architecture.md)
 
 LowTime is a web-first calling app for people on weak or expensive internet connections. It is designed to feel as easy as opening a FaceTime link, but with stronger low-bandwidth behavior, flexible quality controls, and no account requirement.
@@ -20,7 +20,7 @@ LowTime is a web-first calling app for people on weak or expensive internet conn
 - Monorepo scaffolding is in place for `apps/web`, `apps/server`, and `packages/shared`.
 - Docker Compose baseline is in place for local development and single-host deployment.
 - CI and linting baseline is in place for pull requests and pushes to `main`.
-- Room creation, share-link generation, public join admission, SFU token handoff, the first basic in-call UI, and a network health badge are in place for the core 1:1 flow.
+- Room creation, share-link generation, public join admission, SFU token handoff, the first basic in-call UI, the network health badge, and the installable PWA shell are in place for the core 1:1 flow.
 
 ## Planned Stack
 - Web client: React + TypeScript + PWA shell

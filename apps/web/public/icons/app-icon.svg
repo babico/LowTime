@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title>LowTime</title>
+  <rect width="256" height="256" rx="56" fill="#0f172a" />
+  <path d="M64 88c0-13.255 10.745-24 24-24h56c13.255 0 24 10.745 24 24v80c0 13.255-10.745 24-24 24H88c-13.255 0-24-10.745-24-24V88Z" fill="#e2e8f0" />
+  <path d="M146 112.8 195.238 84c6.4-3.745 14.762.873 14.762 8.287v71.426c0 7.414-8.362 12.032-14.762 8.287L146 143.2v-30.4Z" fill="#38bdf8" />
+  <path d="M94 108h27.5v14H108v13h12v14h-12v27H94v-68Z" fill="#0f172a" />
+  <path d="M132 108h14v68h-14v-68Z" fill="#0f172a" />
+</svg>

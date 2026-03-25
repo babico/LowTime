@@ -3,7 +3,7 @@
 - Purpose: Describe the route structure, UI ownership, state boundaries, and client-side responsibilities for the LowTime web app.
 - Audience: Frontend engineers and designers.
 - Status: Baseline
-- Last Updated: 2026-03-24
+- Last Updated: 2026-03-25
 - Related Docs: [Product Overview](01-product-overview.md), [Room And User Flows](03-room-and-user-flows.md), [Media And Quality](04-media-and-quality.md), [ADR-003](adr/ADR-003-pwa-first.md)
 
 ## Overview
@@ -93,4 +93,4 @@ The frontend is a React + TypeScript PWA optimized for mobile browsers first. It
 - Keep contract types in a shared package consumed by the client.
 - Build the media controller as a dedicated subsystem rather than mixing it into UI components.
 - Treat PWA support as shell enhancement, not as offline call support.
-- Current implementation supports room creation, display-name join on `/r/:slug`, and a basic `/r/:slug/call` route with local self-view, remote tile area, mute/camera/leave controls, and a lightweight network health badge on top of LiveKit.
+- Current implementation supports room creation, display-name join on `/r/:slug`, and a basic `/r/:slug/call` route with local self-view, remote tile area, mute/camera/leave controls, a lightweight network health badge, and an installable PWA shell with manifest, service-worker registration, and landing-page install prompt behavior on top of LiveKit.

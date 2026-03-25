@@ -19,6 +19,12 @@ import {
 import { connectToSfu } from "./media-controller.js";
 import { assessNetworkHealth, getNetworkHealthLabel, type NetworkHealth } from "./network-health.js";
 import {
+  attachInstallPromptListeners,
+  isPwaInstalled,
+  promptForInstallation,
+  type BeforeInstallPromptEvent,
+} from "./pwa.js";
+import {
   buildRequestedMedia,
   clearStoredCallSession,
   getApiBaseUrl,
@@ -68,6 +74,10 @@ export function App() {
       isOnline: typeof navigator === "undefined" ? true : navigator.onLine,
     }),
   );
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installMessage, setInstallMessage] = useState<string | null>(null);
+  const [isInstallingApp, setIsInstallingApp] = useState(false);
+  const [isStandaloneApp, setIsStandaloneApp] = useState(() => getStandaloneAppState());
 
   const apiBaseUrl = useMemo(
     () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
@@ -87,6 +97,23 @@ export function App() {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
+  }, []);
+
+  useEffect(() => {
+    setIsStandaloneApp(getStandaloneAppState());
+
+    return attachInstallPromptListeners(window, {
+      onPromptAvailable: (event) => {
+        setDeferredInstallPrompt(event);
+        setInstallMessage("Install LowTime for faster access from your home screen.");
+      },
+      onInstalled: () => {
+        setDeferredInstallPrompt(null);
+        setIsInstallingApp(false);
+        setIsStandaloneApp(true);
+        setInstallMessage("LowTime is installed and ready to launch like an app.");
+      },
+    });
   }, []);
 
   useEffect(() => {
@@ -390,6 +417,26 @@ export function App() {
     }
 
     await navigator.clipboard.writeText(toAbsoluteJoinUrl(createResult.joinUrl));
+  }
+
+  async function handleInstallApp() {
+    if (deferredInstallPrompt == null) {
+      return;
+    }
+
+    setIsInstallingApp(true);
+
+    try {
+      const outcome = await promptForInstallation(deferredInstallPrompt);
+      setDeferredInstallPrompt(null);
+      setInstallMessage(
+        outcome === "accepted"
+          ? "Install accepted. Your browser will finish adding LowTime."
+          : "Install dismissed. You can still add LowTime from your browser menu later.",
+      );
+    } finally {
+      setIsInstallingApp(false);
+    }
   }
 
   function handleOpenRoom() {
@@ -697,6 +744,21 @@ export function App() {
     <main>
       <h1>LowTime</h1>
       <p>Create a room fast, share the link, and move directly into the SFU-backed join flow.</p>
+      {isStandaloneApp || deferredInstallPrompt || installMessage ? (
+        <section style={installCardStyle}>
+          <h2 style={installHeadingStyle}>App Access</h2>
+          <p style={mutedParagraphStyle}>
+            {isStandaloneApp
+              ? "LowTime is already installed on this device."
+              : installMessage ?? "Add LowTime to your home screen for faster repeat joins."}
+          </p>
+          {!isStandaloneApp && deferredInstallPrompt ? (
+            <button type="button" onClick={() => void handleInstallApp()} disabled={isInstallingApp}>
+              {isInstallingApp ? "Opening Install Prompt..." : "Install LowTime"}
+            </button>
+          ) : null}
+        </section>
+      ) : null}
       <button type="button" onClick={() => void handleCreateRoom()} disabled={isCreating}>
         {isCreating ? "Creating..." : "Start Call"}
       </button>
@@ -734,6 +796,21 @@ const callPageStyle = {
   padding: "1rem",
   maxWidth: "72rem",
   margin: "0 auto",
+} as const;
+
+const installCardStyle = {
+  display: "grid",
+  gap: "0.75rem",
+  background: "#e0f2fe",
+  border: "1px solid #7dd3fc",
+  borderRadius: "1rem",
+  padding: "1rem",
+  marginBottom: "1rem",
+  maxWidth: "32rem",
+} as const;
+
+const installHeadingStyle = {
+  margin: 0,
 } as const;
 
 const callHeaderStyle = {
@@ -928,4 +1005,11 @@ function getNavigatorConnection(): NavigatorConnectionLike | null {
   };
 
   return candidate.connection ?? candidate.mozConnection ?? candidate.webkitConnection ?? null;
+}
+
+function getStandaloneAppState(): boolean {
+  return isPwaInstalled({
+    matchMedia: typeof window.matchMedia === "function" ? window.matchMedia.bind(window) : undefined,
+    navigator,
+  });
 }
