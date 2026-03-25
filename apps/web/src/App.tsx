@@ -17,6 +17,7 @@ import {
   type VideoTrackLike,
 } from "./call-experience.js";
 import { connectToSfu } from "./media-controller.js";
+import { assessNetworkHealth, getNetworkHealthLabel, type NetworkHealth } from "./network-health.js";
 import {
   buildRequestedMedia,
   clearStoredCallSession,
@@ -61,6 +62,12 @@ export function App() {
   const [localVideoTrack, setLocalVideoTrack] = useState<VideoTrackLike | null>(null);
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<VideoTrackLike | null>(null);
   const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
+  const [networkHealth, setNetworkHealth] = useState<NetworkHealth>(() =>
+    assessNetworkHealth({
+      callStatus: "idle",
+      isOnline: typeof navigator === "undefined" ? true : navigator.onLine,
+    }),
+  );
 
   const apiBaseUrl = useMemo(
     () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
@@ -81,6 +88,34 @@ export function App() {
       window.removeEventListener("popstate", handlePopState);
     };
   }, []);
+
+  useEffect(() => {
+    const syncNetworkHealth = () => {
+      const connection = getNavigatorConnection();
+
+      setNetworkHealth(
+        assessNetworkHealth({
+          callStatus,
+          isOnline: typeof navigator === "undefined" ? true : navigator.onLine,
+          effectiveType: connection?.effectiveType,
+          rtt: connection?.rtt,
+        }),
+      );
+    };
+
+    syncNetworkHealth();
+
+    const connection = getNavigatorConnection();
+    window.addEventListener("online", syncNetworkHealth);
+    window.addEventListener("offline", syncNetworkHealth);
+    connection?.addEventListener?.("change", syncNetworkHealth);
+
+    return () => {
+      window.removeEventListener("online", syncNetworkHealth);
+      window.removeEventListener("offline", syncNetworkHealth);
+      connection?.removeEventListener?.("change", syncNetworkHealth);
+    };
+  }, [callStatus]);
 
   useEffect(() => {
     if (viewState.kind === "room") {
@@ -478,8 +513,13 @@ export function App() {
             <h1>LowTime</h1>
             <p style={mutedParagraphStyle}>Room <code>{viewState.slug}</code></p>
           </div>
-          <div style={callStatusBadgeStyle(callStatus)}>
-            {callStatus.replace("_", " ")}
+          <div style={callHeaderBadgeRowStyle}>
+            <div style={networkBadgeStyle(networkHealth)}>
+              {getNetworkHealthLabel(networkHealth)}
+            </div>
+            <div style={callStatusBadgeStyle(callStatus)}>
+              {callStatus.replace("_", " ")}
+            </div>
           </div>
         </section>
         {callSession ? (
@@ -705,6 +745,13 @@ const callHeaderStyle = {
   flexWrap: "wrap",
 } as const;
 
+const callHeaderBadgeRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.75rem",
+  flexWrap: "wrap",
+} as const;
+
 const callLayoutStyle = {
   display: "grid",
   gap: "1rem",
@@ -835,4 +882,51 @@ function callStatusBadgeStyle(callStatus: "idle" | "requesting_token" | "connect
     fontWeight: 600,
     textTransform: "capitalize" as const,
   };
+}
+
+function networkBadgeStyle(networkHealth: NetworkHealth) {
+  return {
+    borderRadius: "999px",
+    padding: "0.5rem 0.75rem",
+    background:
+      networkHealth === "good"
+        ? "#dcfce7"
+        : networkHealth === "fair"
+          ? "#fef3c7"
+          : networkHealth === "poor"
+            ? "#fee2e2"
+            : networkHealth === "offline"
+              ? "#e2e8f0"
+              : "#dbeafe",
+    color:
+      networkHealth === "good"
+        ? "#166534"
+        : networkHealth === "fair"
+          ? "#92400e"
+          : networkHealth === "poor"
+            ? "#b91c1c"
+            : networkHealth === "offline"
+              ? "#334155"
+              : "#1d4ed8",
+    fontWeight: 600,
+  };
+}
+
+interface NavigatorConnectionLike extends EventTarget {
+  effectiveType?: string;
+  rtt?: number;
+}
+
+function getNavigatorConnection(): NavigatorConnectionLike | null {
+  if (typeof navigator === "undefined") {
+    return null;
+  }
+
+  const candidate = navigator as Navigator & {
+    connection?: NavigatorConnectionLike;
+    mozConnection?: NavigatorConnectionLike;
+    webkitConnection?: NavigatorConnectionLike;
+  };
+
+  return candidate.connection ?? candidate.mozConnection ?? candidate.webkitConnection ?? null;
 }
