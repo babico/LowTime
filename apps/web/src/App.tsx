@@ -11,6 +11,10 @@ import type {
   RoomSummary,
 } from "@lowtime/shared";
 
+import { CallPage } from "./features/call/call-page.js";
+import { HomePage } from "./features/home/home-page.js";
+import { RoomPage } from "./features/room/room-page.js";
+import { WaitingPage } from "./features/waiting/waiting-page.js";
 import {
   getFirstVideoTrack,
   getParticipant,
@@ -807,637 +811,101 @@ export function App() {
 
   if (viewState.kind === "call") {
     return (
-      <main style={callPageStyle}>
-        <section style={callHeaderStyle}>
-          <div>
-            <h1>LowTime</h1>
-            <p style={mutedParagraphStyle}>Room <code>{viewState.slug}</code></p>
-          </div>
-          <div style={callHeaderBadgeRowStyle}>
-            <div style={networkBadgeStyle(networkHealth)}>
-              {getNetworkHealthLabel(networkHealth)}
-            </div>
-            <div style={callStatusBadgeStyle(callStatus)}>
-              {callStatus.replace("_", " ")}
-            </div>
-          </div>
-        </section>
-        {callSession ? (
-          <section style={callLayoutStyle}>
-            <section style={remoteTileStyle}>
-              <div style={tileHeaderStyle}>
-                <h2 style={tileHeadingStyle}>Remote</h2>
-                <span>{remoteParticipantLabel}</span>
-              </div>
-              {remoteVideoTrack ? (
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  style={remoteVideoStyle}
-                />
-              ) : (
-                <div style={tilePlaceholderStyle}>
-                  <strong>{remoteParticipantLabel}</strong>
-                  <p style={mutedParagraphStyle}>
-                    {callStatus === "connected"
-                      ? "No remote camera is visible yet."
-                      : "Connecting the first call experience..."}
-                  </p>
-                </div>
-              )}
-            </section>
-            <aside style={selfViewPanelStyle}>
-              <div style={tileHeaderStyle}>
-                <h2 style={tileHeadingStyle}>You</h2>
-                <span>{callSession.displayName}</span>
-              </div>
-              {localVideoTrack && isCameraEnabled ? (
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  style={localVideoStyle}
-                />
-              ) : (
-                <div style={selfPlaceholderStyle}>
-                  <strong>{callSession.displayName}</strong>
-                  <p style={mutedParagraphStyle}>
-                    {isCameraEnabled ? "Camera is preparing..." : "Camera is off."}
-                  </p>
-                </div>
-              )}
-              <dl style={callFactsStyle}>
-                <div>
-                  <dt>Transport</dt>
-                  <dd><code>{callSession.transportPreference}</code></dd>
-                </div>
-                <div>
-                  <dt>Participants</dt>
-                  <dd>{callParticipants}</dd>
-                </div>
-                <div>
-                  <dt>Mic</dt>
-                  <dd>{isMicEnabled ? "On" : "Off"}</dd>
-                </div>
-                <div>
-                  <dt>Camera</dt>
-                  <dd>{isCameraEnabled ? "On" : "Off"}</dd>
-                </div>
-              </dl>
-              {connectedSfuUrl ? (
-                <p style={metaTextStyle}>
-                  SFU <code>{connectedSfuUrl}</code>
-                </p>
-              ) : null}
-            </aside>
-            <section style={controlsPanelStyle}>
-              <button
-                type="button"
-                onClick={() => void handleToggleMicrophone()}
-                disabled={callStatus !== "connected" || isTogglingMic}
-                style={secondaryControlStyle}
-              >
-                {isTogglingMic ? "Updating Mic..." : isMicEnabled ? "Mute" : "Unmute"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleToggleCamera()}
-                disabled={callStatus !== "connected" || isTogglingCamera}
-                style={secondaryControlStyle}
-              >
-                {isTogglingCamera ? "Updating Camera..." : isCameraEnabled ? "Turn Camera Off" : "Turn Camera On"}
-              </button>
-              <button type="button" onClick={handleLeaveCall} style={dangerControlStyle}>
-                Leave Call
-              </button>
-            </section>
-            {callError ? <p role="alert">{callError}</p> : null}
-          </section>
-        ) : (
-          <>
-            {callError ? <p role="alert">{callError}</p> : null}
-            <button
-              type="button"
-              onClick={() => {
-                window.history.pushState({}, "", `/r/${viewState.slug}`);
-                setViewState(getViewState(window.location.pathname));
-              }}
-            >
-              Back To Join Screen
-            </button>
-          </>
-        )}
-      </main>
+      <CallPage
+        callError={callError}
+        callParticipants={callParticipants}
+        callSession={callSession}
+        callStatus={callStatus}
+        connectedSfuUrl={connectedSfuUrl}
+        hasLocalVideo={localVideoTrack != null}
+        hasRemoteVideo={remoteVideoTrack != null}
+        isCameraEnabled={isCameraEnabled}
+        isMicEnabled={isMicEnabled}
+        isTogglingCamera={isTogglingCamera}
+        isTogglingMic={isTogglingMic}
+        localVideoRef={localVideoRef}
+        networkHealth={networkHealth}
+        remoteParticipantLabel={remoteParticipantLabel}
+        remoteVideoRef={remoteVideoRef}
+        slug={viewState.slug}
+        onBackToJoin={() => {
+          window.history.pushState({}, "", `/r/${viewState.slug}`);
+          setViewState(getViewState(window.location.pathname));
+        }}
+        onLeaveCall={handleLeaveCall}
+        onToggleCamera={handleToggleCamera}
+        onToggleMicrophone={handleToggleMicrophone}
+      />
     );
   }
 
   if (viewState.kind === "waiting") {
     return (
-      <main style={callPageStyle}>
-        <section style={previewCardStyle}>
-          <h1>Waiting For Host Approval</h1>
-          <p style={mutedParagraphStyle}>
-            Room <code>{viewState.slug}</code> is using lobby mode. We&apos;ll move you into the call as soon as the host approves your request.
-          </p>
-          {waitingRequest ? (
-            <dl style={callFactsStyle}>
-              <div>
-                <dt>Name</dt>
-                <dd>{waitingRequest.displayName}</dd>
-              </div>
-              <div>
-                <dt>Preset</dt>
-                <dd>{getQualityPresetLabel(waitingRequest.qualityPreset)}</dd>
-              </div>
-              <div>
-                <dt>Mic</dt>
-                <dd>{waitingRequest.requestedMedia.audio ? "On" : "Off"}</dd>
-              </div>
-              <div>
-                <dt>Camera</dt>
-                <dd>{waitingRequest.requestedMedia.video ? "On" : "Off"}</dd>
-              </div>
-            </dl>
-          ) : null}
-          {waitingStatus?.status === "waiting" || waitingStatus == null ? (
-            <p>Approval is still pending.</p>
-          ) : null}
-          {waitingStatus?.status === "denied" ? (
-            <p role="alert">
-              Host denied this request: <strong>{waitingStatus.reason}</strong>
-            </p>
-          ) : null}
-          {waitingError ? <p role="alert">{waitingError}</p> : null}
-          <button
-            type="button"
-            onClick={() => {
-              clearStoredLobbyRequest(window.sessionStorage, viewState.slug);
-              window.history.pushState({}, "", `/r/${viewState.slug}`);
-              setViewState(getViewState(window.location.pathname));
-            }}
-          >
-            Back To Join Screen
-          </button>
-        </section>
-      </main>
+      <WaitingPage
+        slug={viewState.slug}
+        waitingError={waitingError}
+        waitingRequest={waitingRequest}
+        waitingStatus={waitingStatus}
+        onBackToJoin={() => {
+          clearStoredLobbyRequest(window.sessionStorage, viewState.slug);
+          window.history.pushState({}, "", `/r/${viewState.slug}`);
+          setViewState(getViewState(window.location.pathname));
+        }}
+      />
     );
   }
 
   if (viewState.kind === "room") {
     return (
-      <main>
-        <h1>LowTime</h1>
-        <p>Open the room with only a display name, then move straight into the first SFU-backed call path.</p>
-        <p>
-          <strong>Room slug:</strong> {viewState.slug}
-        </p>
-        {isLoadingRoom ? <p>Loading room details...</p> : null}
-        {roomError ? <p role="alert">{roomError}</p> : null}
-        {roomSummary ? (
-          <>
-            <section>
-              <h2>Room Preview</h2>
-              <p>
-                Access mode: <strong>{roomSummary.accessMode}</strong>
-              </p>
-              <p>
-                Max participants: <strong>{roomSummary.maxParticipants}</strong>
-              </p>
-              <p>
-                Quality cap: <strong>{roomSummary.qualityCap}</strong>
-              </p>
-              <p>
-                Expires at: <strong>{new Date(roomSummary.expiresAt).toLocaleString()}</strong>
-              </p>
-            </section>
-            <section>
-              <h2>Join Room</h2>
-              <div style={joinPreviewGridStyle}>
-                <section style={previewCardStyle}>
-                  <div style={tileHeaderStyle}>
-                    <h3 style={tileHeadingStyle}>Device Preview</h3>
-                    <span>{getQualityPresetLabel(selectedQualityPreset)}</span>
-                  </div>
-                  {previewState === "ready" && previewVideoEnabled ? (
-                    <video
-                      ref={previewVideoRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      style={previewVideoStyle}
-                    />
-                  ) : (
-                    <div style={previewPlaceholderStyle}>
-                      <strong>{previewVideoEnabled ? "Preview ready when you are" : "Audio-only join selected"}</strong>
-                      <p style={mutedParagraphStyle}>{getPreviewStateMessage(previewState, previewError)}</p>
-                    </div>
-                  )}
-                  <div style={previewOptionsStyle}>
-                    <label style={toggleOptionStyle}>
-                      <input
-                        type="checkbox"
-                        checked={previewAudioEnabled}
-                        onChange={(event) => setPreviewAudioEnabled(event.target.checked)}
-                      />
-                      Start with microphone
-                    </label>
-                    <label style={toggleOptionStyle}>
-                      <input
-                        type="checkbox"
-                        checked={previewVideoEnabled}
-                        onChange={(event) => setPreviewVideoEnabled(event.target.checked)}
-                      />
-                      Start with camera
-                    </label>
-                    <label style={toggleOptionStyle}>
-                      Quality preset
-                      <select
-                        value={selectedQualityPreset}
-                        onChange={(event) => setSelectedQualityPreset(event.target.value as QualityPreset)}
-                      >
-                        <option value="data_saver">Data Saver</option>
-                        <option value="balanced">Balanced</option>
-                        <option value="best_quality">Best Quality</option>
-                      </select>
-                    </label>
-                  </div>
-                  <button type="button" onClick={() => void handleStartPreview()} disabled={previewState === "requesting"}>
-                    {previewState === "requesting" ? "Starting Preview..." : "Start Device Preview"}
-                  </button>
-                </section>
-              </div>
-              <label>
-                Display name
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Enter your name"
-                />
-              </label>
-              <div>
-                <button type="button" onClick={() => void handleJoinRoom()} disabled={isJoining}>
-                  {isJoining ? "Joining..." : "Join Room"}
-                </button>
-              </div>
-              {joinError ? <p role="alert">{joinError}</p> : null}
-              {joinResult?.joinState === "waiting" ? (
-                <p>
-                  Waiting for host approval. Request <code>{joinResult.requestId}</code> is queued.
-                </p>
-              ) : null}
-              {joinResult?.joinState === "denied" ? (
-                <p>
-                  Join denied: <strong>{joinResult.reason}</strong>
-                </p>
-              ) : null}
-            </section>
-            {roomSummary.accessMode === "lobby" && hostSecret ? (
-              <section style={previewCardStyle}>
-                <div style={tileHeaderStyle}>
-                  <h2 style={tileHeadingStyle}>Host Lobby Queue</h2>
-                  <span>{hostLobbyRequests.length} pending</span>
-                </div>
-                {hostLobbyRequests.length === 0 ? (
-                  <p style={mutedParagraphStyle}>No one is waiting right now.</p>
-                ) : (
-                  <div style={hostQueueStyle}>
-                    {hostLobbyRequests.map((request) => (
-                      <article key={request.requestId} style={hostQueueItemStyle}>
-                        <div>
-                          <strong>{request.displayName}</strong>
-                          <p style={mutedParagraphStyle}>
-                            Requested at {new Date(request.createdAt).toLocaleTimeString()}
-                          </p>
-                        </div>
-                        <div style={controlsPanelStyle}>
-                          <button type="button" onClick={() => void handleHostLobbyAction(request.requestId, "approve")}>
-                            Approve
-                          </button>
-                          <button type="button" onClick={() => void handleHostLobbyAction(request.requestId, "deny")}>
-                            Deny
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-                {hostLobbyError ? <p role="alert">{hostLobbyError}</p> : null}
-              </section>
-            ) : null}
-          </>
-        ) : null}
-      </main>
+      <RoomPage
+        displayName={displayName}
+        hostLobbyError={hostLobbyError}
+        hostLobbyRequests={hostLobbyRequests}
+        hostSecret={hostSecret}
+        isJoining={isJoining}
+        isLoadingRoom={isLoadingRoom}
+        joinError={joinError}
+        joinResult={joinResult}
+        previewAudioEnabled={previewAudioEnabled}
+        previewError={previewError}
+        previewState={previewState}
+        previewVideoEnabled={previewVideoEnabled}
+        previewVideoRef={previewVideoRef}
+        roomError={roomError}
+        roomSummary={roomSummary}
+        selectedQualityPreset={selectedQualityPreset}
+        slug={viewState.slug}
+        onDisplayNameChange={setDisplayName}
+        onHostLobbyAction={handleHostLobbyAction}
+        onJoinRoom={handleJoinRoom}
+        onPreviewAudioChange={setPreviewAudioEnabled}
+        onPreviewVideoChange={setPreviewVideoEnabled}
+        onQualityPresetChange={setSelectedQualityPreset}
+        onStartPreview={handleStartPreview}
+      />
     );
   }
 
   return (
-    <main>
-      <h1>LowTime</h1>
-      <p>Create a room fast, share the link, and move directly into the SFU-backed join flow.</p>
-      {isStandaloneApp || deferredInstallPrompt || installMessage ? (
-        <section style={installCardStyle}>
-          <h2 style={installHeadingStyle}>App Access</h2>
-          <p style={mutedParagraphStyle}>
-            {isStandaloneApp
-              ? "LowTime is already installed on this device."
-              : installMessage ?? "Add LowTime to your home screen for faster repeat joins."}
-          </p>
-          {!isStandaloneApp && deferredInstallPrompt ? (
-            <button type="button" onClick={() => void handleInstallApp()} disabled={isInstallingApp}>
-              {isInstallingApp ? "Opening Install Prompt..." : "Install LowTime"}
-            </button>
-          ) : null}
-        </section>
-      ) : null}
-      <button type="button" onClick={() => void handleCreateRoom()} disabled={isCreating}>
-        {isCreating ? "Creating..." : "Start Call"}
-      </button>
-      {createError ? <p role="alert">{createError}</p> : null}
-      {createResult ? (
-        <section>
-          <h2>Room Ready</h2>
-          <p>
-            <strong>Share link:</strong>{" "}
-            <a href={createResult.joinUrl}>{toAbsoluteJoinUrl(createResult.joinUrl)}</a>
-          </p>
-          <p>
-            <strong>Host secret:</strong> {createResult.hostSecret}
-          </p>
-          <p>Store the host secret locally. It is not included in the room link.</p>
-          <button type="button" onClick={() => void handleCopyLink()}>
-            Copy Link
-          </button>{" "}
-          <button type="button" onClick={handleOpenRoom}>
-            Open Link
-          </button>
-        </section>
-      ) : null}
-    </main>
+    <HomePage
+      createError={createError}
+      createResult={createResult}
+      isCreating={isCreating}
+      isInstallingApp={isInstallingApp}
+      isStandaloneApp={isStandaloneApp}
+      installMessage={installMessage}
+      shareUrl={createResult ? toAbsoluteJoinUrl(createResult.joinUrl) : null}
+      showInstallPrompt={deferredInstallPrompt != null}
+      onCopyLink={handleCopyLink}
+      onCreateRoom={handleCreateRoom}
+      onInstallApp={handleInstallApp}
+      onOpenRoom={handleOpenRoom}
+    />
   );
 }
 
 function toAbsoluteJoinUrl(joinUrl: string): string {
   return new URL(joinUrl, window.location.origin).toString();
-}
-
-const callPageStyle = {
-  display: "grid",
-  gap: "1rem",
-  padding: "1rem",
-  maxWidth: "72rem",
-  margin: "0 auto",
-} as const;
-
-const installCardStyle = {
-  display: "grid",
-  gap: "0.75rem",
-  background: "#e0f2fe",
-  border: "1px solid #7dd3fc",
-  borderRadius: "1rem",
-  padding: "1rem",
-  marginBottom: "1rem",
-  maxWidth: "32rem",
-} as const;
-
-const installHeadingStyle = {
-  margin: 0,
-} as const;
-
-const callHeaderStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "1rem",
-  flexWrap: "wrap",
-} as const;
-
-const callHeaderBadgeRowStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "0.75rem",
-  flexWrap: "wrap",
-} as const;
-
-const callLayoutStyle = {
-  display: "grid",
-  gap: "1rem",
-} as const;
-
-const joinPreviewGridStyle = {
-  display: "grid",
-  gap: "1rem",
-  marginBottom: "1rem",
-} as const;
-
-const previewCardStyle = {
-  display: "grid",
-  gap: "1rem",
-  padding: "1rem",
-  borderRadius: "1rem",
-  background: "#e2e8f0",
-} as const;
-
-const previewPlaceholderStyle = {
-  minHeight: "14rem",
-  display: "grid",
-  placeItems: "center",
-  textAlign: "center",
-  background: "#cbd5e1",
-  borderRadius: "0.75rem",
-  padding: "1rem",
-} as const;
-
-const previewVideoStyle = {
-  width: "100%",
-  maxWidth: "24rem",
-  aspectRatio: "16 / 10",
-  objectFit: "cover",
-  borderRadius: "0.75rem",
-  background: "#0f172a",
-} as const;
-
-const previewOptionsStyle = {
-  display: "grid",
-  gap: "0.75rem",
-} as const;
-
-const hostQueueStyle = {
-  display: "grid",
-  gap: "0.75rem",
-} as const;
-
-const hostQueueItemStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "1rem",
-  flexWrap: "wrap",
-  padding: "0.75rem 1rem",
-  borderRadius: "0.75rem",
-  background: "#f8fafc",
-} as const;
-
-const toggleOptionStyle = {
-  display: "grid",
-  gap: "0.35rem",
-} as const;
-
-const remoteTileStyle = {
-  minHeight: "20rem",
-  background: "#0f172a",
-  color: "#f8fafc",
-  borderRadius: "1rem",
-  padding: "1rem",
-  display: "grid",
-  gap: "1rem",
-} as const;
-
-const selfViewPanelStyle = {
-  background: "#e2e8f0",
-  borderRadius: "1rem",
-  padding: "1rem",
-  display: "grid",
-  gap: "1rem",
-} as const;
-
-const controlsPanelStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "0.75rem",
-} as const;
-
-const tileHeaderStyle = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "1rem",
-} as const;
-
-const tileHeadingStyle = {
-  margin: 0,
-} as const;
-
-const tilePlaceholderStyle = {
-  minHeight: "16rem",
-  display: "grid",
-  placeItems: "center",
-  textAlign: "center",
-  border: "1px dashed rgba(255, 255, 255, 0.35)",
-  borderRadius: "0.75rem",
-  padding: "1rem",
-} as const;
-
-const selfPlaceholderStyle = {
-  minHeight: "12rem",
-  display: "grid",
-  placeItems: "center",
-  textAlign: "center",
-  background: "#cbd5e1",
-  borderRadius: "0.75rem",
-  padding: "1rem",
-} as const;
-
-const remoteVideoStyle = {
-  width: "100%",
-  minHeight: "16rem",
-  maxHeight: "32rem",
-  objectFit: "cover",
-  borderRadius: "0.75rem",
-  background: "#020617",
-} as const;
-
-const localVideoStyle = {
-  width: "100%",
-  maxWidth: "20rem",
-  aspectRatio: "4 / 3",
-  objectFit: "cover",
-  borderRadius: "0.75rem",
-  background: "#0f172a",
-} as const;
-
-const callFactsStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(8rem, 1fr))",
-  gap: "0.75rem",
-  margin: 0,
-} as const;
-
-const secondaryControlStyle = {
-  borderRadius: "999px",
-  padding: "0.75rem 1rem",
-  border: "1px solid #94a3b8",
-  background: "#f8fafc",
-  color: "#0f172a",
-} as const;
-
-const dangerControlStyle = {
-  borderRadius: "999px",
-  padding: "0.75rem 1rem",
-  border: "1px solid #ef4444",
-  background: "#ef4444",
-  color: "#fff",
-} as const;
-
-const mutedParagraphStyle = {
-  color: "#64748b",
-  margin: 0,
-} as const;
-
-const metaTextStyle = {
-  color: "#334155",
-  margin: 0,
-} as const;
-
-function callStatusBadgeStyle(callStatus: "idle" | "requesting_token" | "connecting" | "connected") {
-  return {
-    borderRadius: "999px",
-    padding: "0.5rem 0.75rem",
-    background:
-      callStatus === "connected"
-        ? "#dcfce7"
-        : callStatus === "idle"
-          ? "#e2e8f0"
-          : "#fef3c7",
-    color:
-      callStatus === "connected"
-        ? "#166534"
-        : callStatus === "idle"
-          ? "#334155"
-          : "#92400e",
-    fontWeight: 600,
-    textTransform: "capitalize" as const,
-  };
-}
-
-function networkBadgeStyle(networkHealth: NetworkHealth) {
-  return {
-    borderRadius: "999px",
-    padding: "0.5rem 0.75rem",
-    background:
-      networkHealth === "good"
-        ? "#dcfce7"
-        : networkHealth === "fair"
-          ? "#fef3c7"
-          : networkHealth === "poor"
-            ? "#fee2e2"
-            : networkHealth === "offline"
-              ? "#e2e8f0"
-              : "#dbeafe",
-    color:
-      networkHealth === "good"
-        ? "#166534"
-        : networkHealth === "fair"
-          ? "#92400e"
-          : networkHealth === "poor"
-            ? "#b91c1c"
-            : networkHealth === "offline"
-              ? "#334155"
-              : "#1d4ed8",
-    fontWeight: 600,
-  };
 }
 
 interface NavigatorConnectionLike extends EventTarget {
