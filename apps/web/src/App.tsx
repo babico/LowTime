@@ -19,6 +19,13 @@ import {
 import { connectToSfu } from "./media-controller.js";
 import { assessNetworkHealth, getNetworkHealthLabel, type NetworkHealth } from "./network-health.js";
 import {
+  buildPreviewConstraints,
+  getPreviewStateMessage,
+  getQualityPresetLabel,
+  stopMediaStream,
+  type PreviewState,
+} from "./device-preview.js";
+import {
   attachInstallPromptListeners,
   isPwaInstalled,
   promptForInstallation,
@@ -52,6 +59,11 @@ export function App() {
   const [isLoadingRoom, setIsLoadingRoom] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
+  const [selectedQualityPreset, setSelectedQualityPreset] = useState<QualityPreset>(DEFAULT_QUALITY_PRESET);
+  const [previewAudioEnabled, setPreviewAudioEnabled] = useState(DEFAULT_REQUESTED_MEDIA.audio);
+  const [previewVideoEnabled, setPreviewVideoEnabled] = useState(DEFAULT_REQUESTED_MEDIA.video);
+  const [previewState, setPreviewState] = useState<PreviewState>("idle");
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -85,6 +97,8 @@ export function App() {
   );
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -153,8 +167,32 @@ export function App() {
     setJoinError(null);
     setJoinResult(null);
     setDisplayName("");
+    setSelectedQualityPreset(DEFAULT_QUALITY_PRESET);
+    setPreviewAudioEnabled(DEFAULT_REQUESTED_MEDIA.audio);
+    setPreviewVideoEnabled(DEFAULT_REQUESTED_MEDIA.video);
+    setPreviewState("idle");
+    setPreviewError(null);
     setIsLoadingRoom(false);
+    stopMediaStream(previewStreamRef.current);
+    previewStreamRef.current = null;
   }, [viewState]);
+
+  useEffect(() => {
+    const videoElement = previewVideoRef.current;
+    const stream = previewStreamRef.current;
+
+    if (videoElement == null) {
+      return;
+    }
+
+    videoElement.srcObject = stream;
+
+    return () => {
+      if (videoElement.srcObject === stream) {
+        videoElement.srcObject = null;
+      }
+    };
+  }, [previewState, previewVideoEnabled]);
 
   useEffect(() => {
     if (viewState.kind !== "room") {
@@ -465,8 +503,8 @@ export function App() {
         },
         body: JSON.stringify({
           displayName,
-          qualityPreset: DEFAULT_QUALITY_PRESET,
-          requestedMedia: DEFAULT_REQUESTED_MEDIA,
+          qualityPreset: selectedQualityPreset,
+          requestedMedia: buildRequestedMedia(previewAudioEnabled, previewVideoEnabled),
         }),
       });
 
@@ -482,11 +520,13 @@ export function App() {
         saveStoredCallSession(window.sessionStorage, viewState.slug, {
           sessionId: payload.sessionId,
           displayName: displayName.trim(),
-          qualityPreset: DEFAULT_QUALITY_PRESET,
+          qualityPreset: selectedQualityPreset,
           transportPreference: payload.transportPreference,
-          requestedMedia: buildRequestedMedia(DEFAULT_REQUESTED_MEDIA.audio, DEFAULT_REQUESTED_MEDIA.video),
+          requestedMedia: buildRequestedMedia(previewAudioEnabled, previewVideoEnabled),
         });
 
+        stopMediaStream(previewStreamRef.current);
+        previewStreamRef.current = null;
         window.history.pushState({}, "", getCallRoute(viewState.slug));
         setViewState(getViewState(window.location.pathname));
       }
@@ -548,6 +588,37 @@ export function App() {
       setCallError(error instanceof Error ? error.message : "Unable to update camera state");
     } finally {
       setIsTogglingCamera(false);
+    }
+  }
+
+  async function handleStartPreview() {
+    if (typeof navigator === "undefined" || navigator.mediaDevices?.getUserMedia == null) {
+      setPreviewState("error");
+      setPreviewError("This browser does not support live device preview.");
+      return;
+    }
+
+    setPreviewState("requesting");
+    setPreviewError(null);
+
+    try {
+      const requestedMedia = buildRequestedMedia(previewAudioEnabled, previewVideoEnabled);
+      const stream = await navigator.mediaDevices.getUserMedia(buildPreviewConstraints(requestedMedia));
+      stopMediaStream(previewStreamRef.current);
+      previewStreamRef.current = stream;
+      setPreviewState("ready");
+    } catch (error) {
+      stopMediaStream(previewStreamRef.current);
+      previewStreamRef.current = null;
+
+      const name = error instanceof DOMException ? error.name : "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setPreviewState("blocked");
+        setPreviewError("Camera or microphone access was blocked. Adjust browser permissions to preview devices.");
+      } else {
+        setPreviewState("error");
+        setPreviewError(error instanceof Error ? error.message : "Unable to start device preview.");
+      }
     }
   }
 
@@ -708,6 +779,60 @@ export function App() {
             </section>
             <section>
               <h2>Join Room</h2>
+              <div style={joinPreviewGridStyle}>
+                <section style={previewCardStyle}>
+                  <div style={tileHeaderStyle}>
+                    <h3 style={tileHeadingStyle}>Device Preview</h3>
+                    <span>{getQualityPresetLabel(selectedQualityPreset)}</span>
+                  </div>
+                  {previewState === "ready" && previewVideoEnabled ? (
+                    <video
+                      ref={previewVideoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      style={previewVideoStyle}
+                    />
+                  ) : (
+                    <div style={previewPlaceholderStyle}>
+                      <strong>{previewVideoEnabled ? "Preview ready when you are" : "Audio-only join selected"}</strong>
+                      <p style={mutedParagraphStyle}>{getPreviewStateMessage(previewState, previewError)}</p>
+                    </div>
+                  )}
+                  <div style={previewOptionsStyle}>
+                    <label style={toggleOptionStyle}>
+                      <input
+                        type="checkbox"
+                        checked={previewAudioEnabled}
+                        onChange={(event) => setPreviewAudioEnabled(event.target.checked)}
+                      />
+                      Start with microphone
+                    </label>
+                    <label style={toggleOptionStyle}>
+                      <input
+                        type="checkbox"
+                        checked={previewVideoEnabled}
+                        onChange={(event) => setPreviewVideoEnabled(event.target.checked)}
+                      />
+                      Start with camera
+                    </label>
+                    <label style={toggleOptionStyle}>
+                      Quality preset
+                      <select
+                        value={selectedQualityPreset}
+                        onChange={(event) => setSelectedQualityPreset(event.target.value as QualityPreset)}
+                      >
+                        <option value="data_saver">Data Saver</option>
+                        <option value="balanced">Balanced</option>
+                        <option value="best_quality">Best Quality</option>
+                      </select>
+                    </label>
+                  </div>
+                  <button type="button" onClick={() => void handleStartPreview()} disabled={previewState === "requesting"}>
+                    {previewState === "requesting" ? "Starting Preview..." : "Start Device Preview"}
+                  </button>
+                </section>
+              </div>
               <label>
                 Display name
                 <input
@@ -831,6 +956,49 @@ const callHeaderBadgeRowStyle = {
 const callLayoutStyle = {
   display: "grid",
   gap: "1rem",
+} as const;
+
+const joinPreviewGridStyle = {
+  display: "grid",
+  gap: "1rem",
+  marginBottom: "1rem",
+} as const;
+
+const previewCardStyle = {
+  display: "grid",
+  gap: "1rem",
+  padding: "1rem",
+  borderRadius: "1rem",
+  background: "#e2e8f0",
+} as const;
+
+const previewPlaceholderStyle = {
+  minHeight: "14rem",
+  display: "grid",
+  placeItems: "center",
+  textAlign: "center",
+  background: "#cbd5e1",
+  borderRadius: "0.75rem",
+  padding: "1rem",
+} as const;
+
+const previewVideoStyle = {
+  width: "100%",
+  maxWidth: "24rem",
+  aspectRatio: "16 / 10",
+  objectFit: "cover",
+  borderRadius: "0.75rem",
+  background: "#0f172a",
+} as const;
+
+const previewOptionsStyle = {
+  display: "grid",
+  gap: "0.75rem",
+} as const;
+
+const toggleOptionStyle = {
+  display: "grid",
+  gap: "0.35rem",
 } as const;
 
 const remoteTileStyle = {
