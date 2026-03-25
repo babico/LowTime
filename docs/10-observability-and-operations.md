@@ -85,3 +85,4 @@ B --> K
 - Tag metrics by browser, device class, transport, and preset where possible.
 - Redact secrets in logs, traces, and error reporting by default.
 - Keep dashboard ownership clear once the team grows.
+- Current implementation exposes a client-side network health badge in the call header using browser online state plus lightweight connection heuristics; deeper transport-quality metrics are still future work.

@@ -38,7 +38,7 @@
 | Join screen with device preview | `planned` | Includes permission flow and preset selection | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | SFU integration for 1:1 rooms | `done` | Issue #7. Added LiveKit token issuance, a minimal `/r/:slug/call` handoff, and a web SFU connection flow for direct joins | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Basic in-call UI | `done` | Issue #8. Added a usable call screen with remote tile area, local self-view, and mute/camera/leave controls on the LiveKit path | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
-| Network health badge | `planned` | Surface degraded connectivity to the user | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
+| Network health badge | `done` | Issue #9. Added a call-header badge that reflects offline, reconnecting, poor, fair, and good network states from browser connectivity heuristics | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
 | PWA shell and installability | `planned` | Manifest, shell caching, and install prompt behavior | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 
 ## Phase 2: Admission Control And Recovery
