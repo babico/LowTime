@@ -3,7 +3,7 @@
 - Purpose: Define the REST endpoints, WebSocket events, authentication rules, and shared type shapes for LowTime.
 - Audience: Frontend and backend engineers, QA, and future SDK authors.
 - Status: Baseline
-- Last Updated: 2026-03-24
+- Last Updated: 2026-03-25
 - Related Docs: [Room And User Flows](03-room-and-user-flows.md), [Data Model And Lifecycle](06-data-model-and-lifecycle.md), [Backend Architecture](08-backend-architecture.md)
 
 ## Overview
@@ -225,3 +225,8 @@ Current implementation notes:
 - Contract changes must be reflected here before implementation merges.
 - Shared types should be published from a single TypeScript package consumed by client and server.
 - Host secret must never be stored in URLs, query strings, or analytics payloads.
+- Current implementation now includes:
+  - `GET /api/rooms/:slug/lobby` for host-visible pending requests using `x-host-secret`
+  - `GET /api/rooms/:slug/lobby/:requestId` for guest waiting-room polling
+  - `POST /api/rooms/:slug/lobby/:requestId/approve` for host admission
+  - `POST /api/rooms/:slug/lobby/:requestId/deny` for host denial

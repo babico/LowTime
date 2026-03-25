@@ -13,6 +13,7 @@ export type TransportPreference = "sfu" | "p2p";
 export type JoinState = "direct" | "waiting" | "denied";
 
 export type JoinDeniedReason = "room_full" | "room_expired" | "passcode_required" | "invalid_passcode";
+export type LobbyRequestStatus = "waiting" | "approved" | "denied";
 
 export interface RoomSummary {
   slug: RoomSlug;
@@ -71,6 +72,32 @@ export type JoinRoomResponse =
   | JoinRoomDirectResponse
   | JoinRoomWaitingResponse
   | JoinRoomDeniedResponse;
+
+export interface LobbyRequestSummary {
+  requestId: string;
+  displayName: string;
+  createdAt: string;
+}
+
+export interface LobbyRequestStatusWaitingResponse {
+  status: "waiting";
+}
+
+export interface LobbyRequestStatusApprovedResponse {
+  status: "approved";
+  sessionId: string;
+  transportPreference: TransportPreference;
+}
+
+export interface LobbyRequestStatusDeniedResponse {
+  status: "denied";
+  reason: "host_denied" | "room_expired" | "room_closed";
+}
+
+export type LobbyRequestStatusResponse =
+  | LobbyRequestStatusWaitingResponse
+  | LobbyRequestStatusApprovedResponse
+  | LobbyRequestStatusDeniedResponse;
 
 export interface MediaTokenRequest {
   sessionId: string;
