@@ -1,5 +1,6 @@
 export interface VideoTrackLike {
   kind: string;
+  isMuted?: boolean;
   attach(element: HTMLMediaElement): HTMLMediaElement;
   detach(element?: HTMLMediaElement): HTMLMediaElement[];
 }
@@ -24,6 +25,10 @@ export function getPrimaryParticipant(participants: Iterable<unknown>): Particip
   return null;
 }
 
+export function getParticipant(value: unknown): ParticipantLike | null {
+  return isParticipantLike(value) ? value : null;
+}
+
 export function getParticipantLabel(participant: Pick<ParticipantLike, "identity" | "name"> | null, fallback: string) {
   if (participant == null) {
     return fallback;
@@ -44,7 +49,7 @@ export function getFirstVideoTrack(participant: ParticipantLike | null): VideoTr
   }
 
   for (const publication of participant.trackPublications.values()) {
-    if (publication.track?.kind === "video") {
+    if (publication.track?.kind === "video" && publication.track.isMuted !== true) {
       return publication.track;
     }
   }

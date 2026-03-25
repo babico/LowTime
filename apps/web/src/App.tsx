@@ -11,9 +11,9 @@ import type {
 
 import {
   getFirstVideoTrack,
+  getParticipant,
   getParticipantLabel,
   getPrimaryParticipant,
-  type ParticipantLike,
   type VideoTrackLike,
 } from "./call-experience.js";
 import { connectToSfu } from "./media-controller.js";
@@ -183,10 +183,11 @@ export function App() {
       return;
     }
 
-    localVideoTrack.attach(videoElement);
+    const attachedTrack = localVideoTrack;
+    attachedTrack.attach(videoElement);
 
     return () => {
-      localVideoTrack.detach(videoElement);
+      attachedTrack.detach(videoElement);
     };
   }, [localVideoTrack]);
 
@@ -197,10 +198,11 @@ export function App() {
       return;
     }
 
-    remoteVideoTrack.attach(videoElement);
+    const attachedTrack = remoteVideoTrack;
+    attachedTrack.attach(videoElement);
 
     return () => {
-      remoteVideoTrack.detach(videoElement);
+      attachedTrack.detach(videoElement);
     };
   }, [remoteVideoTrack]);
 
@@ -260,9 +262,10 @@ export function App() {
 
         const syncCallPresentation = () => {
           const nextRemoteParticipant = getPrimaryParticipant(room.remoteParticipants.values());
+          const nextLocalParticipant = getParticipant(room.localParticipant);
 
           setCallParticipants(room.remoteParticipants.size + 1);
-          setLocalVideoTrack(getFirstVideoTrack(room.localParticipant as unknown as ParticipantLike));
+          setLocalVideoTrack(getFirstVideoTrack(nextLocalParticipant));
           setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
           setRemoteParticipantLabel(getParticipantLabel(nextRemoteParticipant, "Waiting for someone to join"));
         };
@@ -454,9 +457,11 @@ export function App() {
     setCallError(null);
 
     try {
-      await callRoomRef.current.localParticipant.setCameraEnabled(nextValue);
+      const room = callRoomRef.current;
+
+      await room.localParticipant.setCameraEnabled(nextValue);
       setIsCameraEnabled(nextValue);
-      const nextLocalParticipant = callRoomRef.current.localParticipant as unknown as ParticipantLike;
+      const nextLocalParticipant = getParticipant(room.localParticipant);
       setLocalVideoTrack(nextValue ? getFirstVideoTrack(nextLocalParticipant) : null);
     } catch (error) {
       setCallError(error instanceof Error ? error.message : "Unable to update camera state");
