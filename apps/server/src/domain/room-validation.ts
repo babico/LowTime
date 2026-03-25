@@ -7,7 +7,7 @@ import type {
   TransportPreference,
 } from "@lowtime/shared";
 
-import type { CreateStoredRoomInput } from "../server-support.js";
+import type { CreateStoredRoomInput } from "./room-store.js";
 
 const DEFAULT_MAX_PARTICIPANTS = 2;
 const DEFAULT_QUALITY_CAP: QualityCap = "balanced";

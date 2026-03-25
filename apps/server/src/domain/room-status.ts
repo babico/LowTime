@@ -1,6 +1,6 @@
 import type { RoomSummary } from "@lowtime/shared";
 
-import type { StoredRoom } from "../server-support.js";
+import type { StoredRoom } from "./room-store.js";
 
 export function toRoomSummary(room: StoredRoom, now = new Date()): RoomSummary {
   return {

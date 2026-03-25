@@ -93,6 +93,22 @@
 | Metrics, logs, and dashboards | `planned` | Product, media, and abuse visibility | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
 | Abuse and rate-limit controls | `planned` | Protect room creation and join paths | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
 
+## Refactor Program
+
+| Feature | Status | Notes | Source |
+| --- | --- | --- | --- |
+| Web route-level page extraction | `done` | Issue #52. Extracted route-level pages and reduced `App.tsx` size materially | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Web styles extraction from `App.tsx` | `planned` | Issue #53. Shared page styles already moved once; deeper style-module cleanup is still open | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Room and waiting feature-module split | `done` | Issue #54. Room and waiting effects/actions live in feature modules | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Call feature-module split | `done` | Issue #55. Call connection and media sync moved into `features/call/call-effects.ts` | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Preview and install feature-module split | `done` | Issue #56. Install and preview behavior moved into dedicated feature hooks | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Web route helpers and app shell | `done` | Issue #57. Added `app/routes.ts` and `app/app-shell.tsx` | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Server route registration split | `done` | Issue #58. Fastify route modules now own health, rooms, lobby, and media endpoints | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
+| Server room validation and status domain split | `done` | Issue #59. Validation and room status logic now live in domain modules | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
+| Server room-store domain split | `done` | Issue #60. In-memory store and lobby/session mutations moved into `domain/room-store.ts` | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
+| Server integration test split | `done` | Issue #61. Split route coverage into `rooms`, `lobby`, and `media` test files | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
+| Architecture docs for refactored structure | `done` | Issue #62. Updated frontend/backend architecture docs and contributor guidance to match the shipped layout | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
+
 ## Update Rule For Every PR
 - If a feature changes status, update this file.
 - If a feature is done, verify the matching source doc still describes the shipped behavior.
