@@ -90,9 +90,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const syncNetworkHealth = () => {
-      const connection = getNavigatorConnection();
+    const connection = getNavigatorConnection();
 
+    const syncNetworkHealth = () => {
       setNetworkHealth(
         assessNetworkHealth({
           callStatus,
@@ -105,7 +105,6 @@ export function App() {
 
     syncNetworkHealth();
 
-    const connection = getNavigatorConnection();
     window.addEventListener("online", syncNetworkHealth);
     window.addEventListener("offline", syncNetworkHealth);
     connection?.addEventListener?.("change", syncNetworkHealth);
