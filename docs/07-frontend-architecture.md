@@ -93,4 +93,4 @@ The frontend is a React + TypeScript PWA optimized for mobile browsers first. It
 - Keep contract types in a shared package consumed by the client.
 - Build the media controller as a dedicated subsystem rather than mixing it into UI components.
 - Treat PWA support as shell enhancement, not as offline call support.
-- Current implementation supports room creation, display-name join on `/r/:slug`, and a basic `/r/:slug/call` route with local self-view, remote tile area, mute/camera/leave controls, a lightweight network health badge, and an installable PWA shell with manifest, service-worker registration, and landing-page install prompt behavior on top of LiveKit.
+- Current implementation supports room creation, display-name join on `/r/:slug`, a join-side device preview with media toggles and quality preset selection, and a basic `/r/:slug/call` route with local self-view, remote tile area, mute/camera/leave controls, a lightweight network health badge, and an installable PWA shell with manifest, service-worker registration, and landing-page install prompt behavior on top of LiveKit.
