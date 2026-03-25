@@ -5,11 +5,10 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerLobbyRoutes } from "./routes/lobby.js";
 import { registerMediaRoutes } from "./routes/media.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
+import { createInMemoryRoomStore, type RoomStore } from "./domain/room-store.js";
 import {
-  createInMemoryRoomStore,
   createRouteContext,
   type BuildAppOptions,
-  type RoomStore,
 } from "./server-support.js";
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
