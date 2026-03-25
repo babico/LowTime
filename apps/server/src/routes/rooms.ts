@@ -1,13 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import type { CreateRoomRequest, CreateRoomResponse, JoinRoomRequest, JoinRoomResponse, RoomSummary } from "@lowtime/shared";
 
+import { toRoomSummary, getRoomStatus } from "../domain/room-status.js";
+import { validateCreateRoomRequest, validateJoinRoomRequest } from "../domain/room-validation.js";
 import {
   createRoomExpiry,
-  getRoomStatus,
-  toRoomSummary,
   type RouteContext,
-  validateCreateRoomRequest,
-  validateJoinRoomRequest,
 } from "../server-support.js";
 
 export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) {
