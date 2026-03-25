@@ -7,23 +7,25 @@ import type {
   QualityPreset,
 } from "@lowtime/shared";
 
-import { CallPage } from "./features/call/call-page.js";
+import { AppShell } from "./app/app-shell.js";
+import {
+  getCallPageRoute,
+  getRoomRoute,
+  getWaitingPageRoute,
+  pushRoute,
+  readViewState,
+  toAbsoluteJoinUrl,
+} from "./app/routes.js";
 import { useCallFlow } from "./features/call/call-effects.js";
 import { useInstallPrompt } from "./features/home/install-effects.js";
-import { HomePage } from "./features/home/home-page.js";
 import { joinRoomRequest, submitLobbyAction } from "./features/room/room-actions.js";
 import { useDevicePreview } from "./features/room/preview-effects.js";
 import { useRoomPageData } from "./features/room/room-effects.js";
-import { RoomPage } from "./features/room/room-page.js";
 import { useWaitingRoomState } from "./features/waiting/waiting-effects.js";
-import { WaitingPage } from "./features/waiting/waiting-page.js";
 import { assessNetworkHealth, type NetworkHealth } from "./network-health.js";
 import {
   clearStoredLobbyRequest,
   getApiBaseUrl,
-  getCallRoute,
-  getViewState,
-  getWaitingRoute,
   loadStoredHostSecret,
   saveStoredHostSecret,
   saveStoredLobbyRequest,
@@ -33,7 +35,7 @@ import {
 
 const DEFAULT_QUALITY_PRESET: QualityPreset = "balanced";
 export function App() {
-  const [viewState, setViewState] = useState(() => getViewState(window.location.pathname));
+  const [viewState, setViewState] = useState(() => readViewState(window.location));
   const [createResult, setCreateResult] = useState<CreateRoomResponse | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -91,8 +93,7 @@ export function App() {
       requestedMedia: request.requestedMedia,
     });
 
-    window.history.pushState({}, "", getCallRoute(waitingSlug));
-    setViewState(getViewState(window.location.pathname));
+    pushRoute(window.history, window.location, getCallPageRoute(waitingSlug), setViewState);
   }, [waitingSlug]);
   const {
     waitingError,
@@ -151,7 +152,7 @@ export function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setViewState(getViewState(window.location.pathname));
+      setViewState(readViewState(window.location));
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -232,7 +233,7 @@ export function App() {
       return;
     }
 
-    await navigator.clipboard.writeText(toAbsoluteJoinUrl(createResult.joinUrl));
+    await navigator.clipboard.writeText(toAbsoluteJoinUrl(createResult.joinUrl, window.location));
   }
 
   function handleOpenRoom() {
@@ -240,8 +241,7 @@ export function App() {
       return;
     }
 
-    window.history.pushState({}, "", createResult.joinUrl);
-    setViewState(getViewState(window.location.pathname));
+    pushRoute(window.history, window.location, createResult.joinUrl, setViewState);
   }
 
   async function handleJoinRoom() {
@@ -273,8 +273,7 @@ export function App() {
         });
 
         clearPreview();
-        window.history.pushState({}, "", getCallRoute(viewState.slug));
-        setViewState(getViewState(window.location.pathname));
+        pushRoute(window.history, window.location, getCallPageRoute(viewState.slug), setViewState);
       } else if (payload.joinState === "waiting") {
         const storedRequest: StoredLobbyRequest = {
           requestId: payload.requestId,
@@ -284,8 +283,12 @@ export function App() {
         };
 
         saveStoredLobbyRequest(window.sessionStorage, viewState.slug, storedRequest);
-        window.history.pushState({}, "", getWaitingRoute(viewState.slug, payload.requestId));
-        setViewState(getViewState(window.location.pathname));
+        pushRoute(
+          window.history,
+          window.location,
+          getWaitingPageRoute(viewState.slug, payload.requestId),
+          setViewState,
+        );
       }
     } catch (error) {
       setJoinError(error instanceof Error ? error.message : "Unable to join room");
@@ -316,103 +319,93 @@ export function App() {
     }
   }
 
-  if (viewState.kind === "call") {
-    return (
-      <CallPage
-        callError={callError}
-        callParticipants={callParticipants}
-        callSession={callSession}
-        callStatus={callStatus}
-        connectedSfuUrl={connectedSfuUrl}
-        hasLocalVideo={localVideoTrack != null}
-        hasRemoteVideo={remoteVideoTrack != null}
-        isCameraEnabled={isCameraEnabled}
-        isMicEnabled={isMicEnabled}
-        isTogglingCamera={isTogglingCamera}
-        isTogglingMic={isTogglingMic}
-        localVideoRef={localVideoRef}
-        networkHealth={networkHealth}
-        remoteParticipantLabel={remoteParticipantLabel}
-        remoteVideoRef={remoteVideoRef}
-        slug={viewState.slug}
-        onBackToJoin={() => {
-          window.history.pushState({}, "", `/r/${viewState.slug}`);
-          setViewState(getViewState(window.location.pathname));
-        }}
-        onLeaveCall={handleLeaveCall}
-        onToggleCamera={handleToggleCamera}
-        onToggleMicrophone={handleToggleMicrophone}
-      />
-    );
-  }
-
-  if (viewState.kind === "waiting") {
-    return (
-      <WaitingPage
-        slug={viewState.slug}
-        waitingError={waitingError}
-        waitingRequest={waitingRequest}
-        waitingStatus={waitingStatus}
-        onBackToJoin={() => {
-          clearStoredLobbyRequest(window.sessionStorage, viewState.slug);
-          window.history.pushState({}, "", `/r/${viewState.slug}`);
-          setViewState(getViewState(window.location.pathname));
-        }}
-      />
-    );
-  }
-
-  if (viewState.kind === "room") {
-    return (
-      <RoomPage
-        displayName={displayName}
-        hostLobbyError={hostLobbyError}
-        hostLobbyRequests={hostLobbyRequests}
-        hostSecret={hostSecret}
-        isJoining={isJoining}
-        isLoadingRoom={isLoadingRoom}
-        joinError={joinError}
-        joinResult={joinResult}
-        previewAudioEnabled={previewAudioEnabled}
-        previewError={previewError}
-        previewState={previewState}
-        previewVideoEnabled={previewVideoEnabled}
-        previewVideoRef={previewVideoRef}
-        roomError={roomError}
-        roomSummary={roomSummary}
-        selectedQualityPreset={selectedQualityPreset}
-        slug={viewState.slug}
-        onDisplayNameChange={setDisplayName}
-        onHostLobbyAction={handleHostLobbyAction}
-        onJoinRoom={handleJoinRoom}
-        onPreviewAudioChange={setPreviewAudioEnabled}
-        onPreviewVideoChange={setPreviewVideoEnabled}
-        onQualityPresetChange={setSelectedQualityPreset}
-        onStartPreview={handleStartPreview}
-      />
-    );
-  }
-
   return (
-    <HomePage
-      createError={createError}
-      createResult={createResult}
-      isCreating={isCreating}
-      isInstallingApp={isInstallingApp}
-      isStandaloneApp={isStandaloneApp}
-      installMessage={installMessage}
-      shareUrl={createResult ? toAbsoluteJoinUrl(createResult.joinUrl) : null}
-      showInstallPrompt={showInstallPrompt}
-      onCopyLink={handleCopyLink}
-      onCreateRoom={handleCreateRoom}
-      onInstallApp={handleInstallApp}
-      onOpenRoom={handleOpenRoom}
+    <AppShell
+      callPageProps={{
+        callError,
+        callParticipants,
+        callSession,
+        callStatus,
+        connectedSfuUrl,
+        hasLocalVideo: localVideoTrack != null,
+        hasRemoteVideo: remoteVideoTrack != null,
+        isCameraEnabled,
+        isMicEnabled,
+        isTogglingCamera,
+        isTogglingMic,
+        localVideoRef,
+        networkHealth,
+        onLeaveCall: handleLeaveCall,
+        onToggleCamera: handleToggleCamera,
+        onToggleMicrophone: handleToggleMicrophone,
+        remoteParticipantLabel,
+        remoteVideoRef,
+        slug: viewState.kind === "call" ? viewState.slug : "",
+      }}
+      homePageProps={{
+        createError,
+        createResult,
+        isCreating,
+        isInstallingApp,
+        isStandaloneApp,
+        installMessage,
+        onCopyLink: handleCopyLink,
+        onCreateRoom: handleCreateRoom,
+        onInstallApp: handleInstallApp,
+        onOpenRoom: handleOpenRoom,
+        shareUrl: createResult ? toAbsoluteJoinUrl(createResult.joinUrl, window.location) : null,
+        showInstallPrompt,
+      }}
+      onBackToJoinFromCall={() => {
+        if (viewState.kind !== "call") {
+          return;
+        }
+
+        pushRoute(window.history, window.location, getRoomRoute(viewState.slug), setViewState);
+      }}
+      onBackToJoinFromWaiting={() => {
+        if (viewState.kind !== "waiting") {
+          return;
+        }
+
+        clearStoredLobbyRequest(window.sessionStorage, viewState.slug);
+        pushRoute(window.history, window.location, getRoomRoute(viewState.slug), setViewState);
+      }}
+      roomPageProps={{
+        displayName,
+        hostLobbyError,
+        hostLobbyRequests,
+        hostSecret,
+        isJoining,
+        isLoadingRoom,
+        joinError,
+        joinResult,
+        onDisplayNameChange: setDisplayName,
+        onHostLobbyAction: handleHostLobbyAction,
+        onJoinRoom: handleJoinRoom,
+        onPreviewAudioChange: setPreviewAudioEnabled,
+        onPreviewVideoChange: setPreviewVideoEnabled,
+        onQualityPresetChange: setSelectedQualityPreset,
+        onStartPreview: handleStartPreview,
+        previewAudioEnabled,
+        previewError,
+        previewState,
+        previewVideoEnabled,
+        previewVideoRef,
+        roomError,
+        roomSummary,
+        selectedQualityPreset,
+        slug: viewState.kind === "room" ? viewState.slug : roomSlug ?? "",
+      }}
+      viewState={viewState}
+      waitingPageProps={{
+        slug: viewState.kind === "waiting" ? viewState.slug : waitingSlug ?? "",
+        waitingError,
+        waitingRequest,
+        waitingStatus,
+      }}
     />
   );
-}
-
-function toAbsoluteJoinUrl(joinUrl: string): string {
-  return new URL(joinUrl, window.location.origin).toString();
 }
 
 interface NavigatorConnectionLike extends EventTarget {
