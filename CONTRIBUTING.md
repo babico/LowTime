@@ -23,6 +23,16 @@
 - The repository workflow first checks whether the `codex` reviewer request succeeds and skips the `@codex review` comment when Codex reviewer access or review usage is unavailable.
 - Follow the full issue -> branch -> pull request process in [docs/13-issue-branch-pr-workflow.md](docs/13-issue-branch-pr-workflow.md).
 
+## Code Organization
+- Keep frontend route rendering and navigation helpers in `apps/web/src/app/`.
+- Keep frontend feature-specific UI and effects in `apps/web/src/features/<area>/`.
+- Keep frontend shared pure helpers in top-level web modules only when they are used across multiple features.
+- Keep backend HTTP handlers in `apps/server/src/routes/`.
+- Keep backend policy, room state, and validation logic in `apps/server/src/domain/`.
+- Keep backend runtime wiring helpers in `apps/server/src/server-support.ts` unless they become domain logic.
+- Keep server tests split by route area instead of rebuilding a single catch-all integration file.
+- When a file starts accumulating multiple unrelated responsibilities, prefer extracting a focused module beside the owning feature or domain before adding more logic.
+
 ## Required Documentation Updates
 - Update [TODO.md](TODO.md) whenever a tracked feature changes status.
 - Update the relevant file in `docs/` whenever you change:
