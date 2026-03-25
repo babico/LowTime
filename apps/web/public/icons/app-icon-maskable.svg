@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>LowTime</title>
+  <rect width="512" height="512" fill="#020617" />
+  <circle cx="256" cy="256" r="184" fill="#0f172a" />
+  <rect x="144" y="168" width="136" height="176" rx="28" fill="#e2e8f0" />
+  <path d="M276 223.2 370.738 168c12.307-7.198 28.262 1.678 28.262 15.925v144.15c0 14.247-15.955 23.123-28.262 15.925L276 288.8v-65.6Z" fill="#38bdf8" />
+  <path d="M187 212h51v26h-25v24h22v26h-22v51h-26v-127Z" fill="#0f172a" />
+  <path d="M248 212h26v127h-26V212Z" fill="#0f172a" />
+</svg>

@@ -3,7 +3,7 @@
 - Purpose: Track implementation progress feature by feature and provide one living checklist that must be updated whenever work lands.
 - Audience: Engineers, reviewers, and release owners.
 - Status: Active
-- Last Updated: 2026-03-24
+- Last Updated: 2026-03-25
 - Related Docs: [README](README.md), [Docs Map](docs/00-docs-map.md), [Roadmap And Release Phases](docs/12-roadmap-and-release-phases.md), [Testing And QA](docs/11-testing-and-qa.md)
 
 ## How To Use This File
@@ -39,7 +39,7 @@
 | SFU integration for 1:1 rooms | `done` | Issue #7. Added LiveKit token issuance, a minimal `/r/:slug/call` handoff, and a web SFU connection flow for direct joins | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Basic in-call UI | `done` | Issue #8. Added a usable call screen with remote tile area, local self-view, and mute/camera/leave controls on the LiveKit path | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Network health badge | `done` | Issue #9. Added a call-header badge that reflects offline, reconnecting, poor, fair, and good network states from browser connectivity heuristics | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
-| PWA shell and installability | `planned` | Manifest, shell caching, and install prompt behavior | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| PWA shell and installability | `done` | Issue #10. Added a manifest, shell caching service worker, app icons, and a landing-page install prompt | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 
 ## Phase 2: Admission Control And Recovery
 

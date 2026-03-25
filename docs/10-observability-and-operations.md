@@ -3,7 +3,7 @@
 - Purpose: Define what LowTime measures, how it is monitored, and what operators should do when reliability degrades.
 - Audience: Backend, platform, and on-call engineers.
 - Status: Baseline
-- Last Updated: 2026-03-24
+- Last Updated: 2026-03-25
 - Related Docs: [System Architecture](02-system-architecture.md), [Backend Architecture](08-backend-architecture.md), [Testing And QA](11-testing-and-qa.md)
 
 ## Overview
@@ -85,4 +85,4 @@ B --> K
 - Tag metrics by browser, device class, transport, and preset where possible.
 - Redact secrets in logs, traces, and error reporting by default.
 - Keep dashboard ownership clear once the team grows.
-- Current implementation exposes a client-side network health badge in the call header using browser online state plus lightweight connection heuristics; deeper transport-quality metrics are still future work.
+- Current implementation exposes a client-side network health badge in the call header using browser online state plus lightweight connection heuristics; deeper transport-quality metrics are still future work. The PWA shell caches only static app assets, so room state and live call state should still be treated as network-dependent.
