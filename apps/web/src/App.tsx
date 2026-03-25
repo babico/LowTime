@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CreateRoomResponse,
   JoinRoomResponse,
   LobbyRequestStatusResponse,
-  LobbyRequestSummary,
   MediaTokenResponse,
   QualityPreset,
   RequestedMedia,
-  RoomSummary,
 } from "@lowtime/shared";
 
 import { CallPage } from "./features/call/call-page.js";
 import { HomePage } from "./features/home/home-page.js";
+import { joinRoomRequest, startPreviewRequest, submitLobbyAction } from "./features/room/room-actions.js";
+import { useRoomPageData } from "./features/room/room-effects.js";
 import { RoomPage } from "./features/room/room-page.js";
+import { useWaitingRoomState } from "./features/waiting/waiting-effects.js";
 import { WaitingPage } from "./features/waiting/waiting-page.js";
 import {
   getFirstVideoTrack,
@@ -25,9 +26,6 @@ import {
 import { connectToSfu } from "./media-controller.js";
 import { assessNetworkHealth, getNetworkHealthLabel, type NetworkHealth } from "./network-health.js";
 import {
-  buildPreviewConstraints,
-  getPreviewStateMessage,
-  getQualityPresetLabel,
   stopMediaStream,
   type PreviewState,
 } from "./device-preview.js";
@@ -46,7 +44,6 @@ import {
   getViewState,
   getWaitingRoute,
   loadStoredHostSecret,
-  loadStoredLobbyRequest,
   loadStoredCallSession,
   saveStoredHostSecret,
   saveStoredLobbyRequest,
@@ -67,10 +64,6 @@ export function App() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  const [roomSummary, setRoomSummary] = useState<RoomSummary | null>(null);
-  const [roomError, setRoomError] = useState<string | null>(null);
-  const [isLoadingRoom, setIsLoadingRoom] = useState(false);
-
   const [displayName, setDisplayName] = useState("");
   const [selectedQualityPreset, setSelectedQualityPreset] = useState<QualityPreset>(DEFAULT_QUALITY_PRESET);
   const [previewAudioEnabled, setPreviewAudioEnabled] = useState(DEFAULT_REQUESTED_MEDIA.audio);
@@ -80,11 +73,6 @@ export function App() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
   const [isJoining, setIsJoining] = useState(false);
-  const [hostLobbyRequests, setHostLobbyRequests] = useState<LobbyRequestSummary[]>([]);
-  const [hostLobbyError, setHostLobbyError] = useState<string | null>(null);
-  const [waitingRequest, setWaitingRequest] = useState<StoredLobbyRequest | null>(null);
-  const [waitingStatus, setWaitingStatus] = useState<LobbyRequestStatusResponse | null>(null);
-  const [waitingError, setWaitingError] = useState<string | null>(null);
 
   const [callSession, setCallSession] = useState<StoredCallSession | null>(null);
   const [callStatus, setCallStatus] = useState<"idle" | "requesting_token" | "connecting" | "connected">("idle");
@@ -112,11 +100,56 @@ export function App() {
     () => (viewState.kind === "home" ? null : loadStoredHostSecret(window.localStorage, viewState.slug)),
     [viewState],
   );
+  const roomSlug = viewState.kind === "room" ? viewState.slug : null;
+  const waitingSlug = viewState.kind === "waiting" ? viewState.slug : null;
+  const waitingRequestId = viewState.kind === "waiting" ? viewState.requestId : null;
 
   const apiBaseUrl = useMemo(
     () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
     [],
   );
+  const {
+    hostLobbyError,
+    hostLobbyRequests,
+    isLoadingRoom,
+    roomError,
+    roomSummary,
+    setHostLobbyError,
+    setHostLobbyRequests,
+  } = useRoomPageData({
+    apiBaseUrl,
+    hostSecret,
+    slug: roomSlug,
+  });
+  const waitingApprovalHandler = useCallback((
+    request: StoredLobbyRequest,
+    status: Extract<LobbyRequestStatusResponse, { status: "approved" }>,
+  ) => {
+    if (waitingSlug == null) {
+      return;
+    }
+
+    saveStoredCallSession(window.sessionStorage, waitingSlug, {
+      sessionId: status.sessionId,
+      displayName: request.displayName,
+      qualityPreset: request.qualityPreset,
+      transportPreference: status.transportPreference,
+      requestedMedia: request.requestedMedia,
+    });
+
+    window.history.pushState({}, "", getCallRoute(waitingSlug));
+    setViewState(getViewState(window.location.pathname));
+  }, [waitingSlug]);
+  const {
+    waitingError,
+    waitingRequest,
+    waitingStatus,
+  } = useWaitingRoomState({
+    apiBaseUrl,
+    onApproved: waitingApprovalHandler,
+    requestId: waitingRequestId,
+    slug: waitingSlug,
+  });
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);
@@ -184,8 +217,6 @@ export function App() {
       return;
     }
 
-    setRoomSummary(null);
-    setRoomError(null);
     setJoinError(null);
     setJoinResult(null);
     setDisplayName("");
@@ -194,12 +225,6 @@ export function App() {
     setPreviewVideoEnabled(DEFAULT_REQUESTED_MEDIA.video);
     setPreviewState("idle");
     setPreviewError(null);
-    setIsLoadingRoom(false);
-    setHostLobbyRequests([]);
-    setHostLobbyError(null);
-    setWaitingRequest(null);
-    setWaitingStatus(null);
-    setWaitingError(null);
     stopMediaStream(previewStreamRef.current);
     previewStreamRef.current = null;
   }, [viewState]);
@@ -220,175 +245,6 @@ export function App() {
       }
     };
   }, [previewState, previewVideoEnabled]);
-
-  useEffect(() => {
-    if (viewState.kind !== "room" && viewState.kind !== "waiting") {
-      return;
-    }
-
-    const slug = viewState.slug;
-    const abortController = new AbortController();
-
-    async function loadRoom() {
-      setIsLoadingRoom(true);
-      setRoomError(null);
-      setJoinError(null);
-      setJoinResult(null);
-
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/rooms/${slug}`, {
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          throw new Error(payload.message ?? "Unable to load room");
-        }
-
-        const payload = (await response.json()) as RoomSummary;
-        setRoomSummary(payload);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setRoomSummary(null);
-        setRoomError(error instanceof Error ? error.message : "Unable to load room");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoadingRoom(false);
-        }
-      }
-    }
-
-    void loadRoom();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [apiBaseUrl, viewState]);
-
-  useEffect(() => {
-    if (viewState.kind !== "waiting") {
-      return;
-    }
-
-    const storedRequest = loadStoredLobbyRequest(window.sessionStorage, viewState.slug);
-
-    if (storedRequest == null || storedRequest.requestId !== viewState.requestId) {
-      setWaitingRequest(null);
-      setWaitingStatus(null);
-      setWaitingError("Missing waiting-room session. Rejoin from the room page.");
-      return;
-    }
-
-    setWaitingRequest(storedRequest);
-    setWaitingError(null);
-
-    let cancelled = false;
-    let timerId: number | undefined;
-
-    const pollStatus = async () => {
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/lobby/${viewState.requestId}`);
-
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          throw new Error(payload.message ?? "Unable to load waiting-room status");
-        }
-
-        const payload = (await response.json()) as LobbyRequestStatusResponse;
-
-        if (cancelled) {
-          return;
-        }
-
-        setWaitingStatus(payload);
-
-        if (payload.status === "approved") {
-          saveStoredCallSession(window.sessionStorage, viewState.slug, {
-            sessionId: payload.sessionId,
-            displayName: storedRequest.displayName,
-            qualityPreset: storedRequest.qualityPreset,
-            transportPreference: payload.transportPreference,
-            requestedMedia: storedRequest.requestedMedia,
-          });
-          clearStoredLobbyRequest(window.sessionStorage, viewState.slug);
-          window.history.pushState({}, "", getCallRoute(viewState.slug));
-          setViewState(getViewState(window.location.pathname));
-          return;
-        }
-
-        if (payload.status === "waiting") {
-          timerId = window.setTimeout(() => {
-            void pollStatus();
-          }, 3000);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setWaitingError(error instanceof Error ? error.message : "Unable to load waiting-room status");
-        }
-      }
-    };
-
-    void pollStatus();
-
-    return () => {
-      cancelled = true;
-      if (timerId != null) {
-        window.clearTimeout(timerId);
-      }
-    };
-  }, [apiBaseUrl, viewState]);
-
-  useEffect(() => {
-    if (viewState.kind !== "room" || roomSummary?.accessMode !== "lobby" || hostSecret == null) {
-      setHostLobbyRequests([]);
-      setHostLobbyError(null);
-      return;
-    }
-
-    let cancelled = false;
-    let timerId: number | undefined;
-
-    const loadLobbyRequests = async () => {
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/lobby`, {
-          headers: {
-            "x-host-secret": hostSecret,
-          },
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          throw new Error(payload.message ?? "Unable to load lobby requests");
-        }
-
-        const payload = (await response.json()) as { requests: LobbyRequestSummary[] };
-
-        if (!cancelled) {
-          setHostLobbyRequests(payload.requests);
-          setHostLobbyError(null);
-          timerId = window.setTimeout(() => {
-            void loadLobbyRequests();
-          }, 3000);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setHostLobbyError(error instanceof Error ? error.message : "Unable to load lobby requests");
-        }
-      }
-    };
-
-    void loadLobbyRequests();
-
-    return () => {
-      cancelled = true;
-      if (timerId != null) {
-        window.clearTimeout(timerId);
-      }
-    };
-  }, [apiBaseUrl, hostSecret, roomSummary?.accessMode, viewState]);
 
   useEffect(() => {
     if (viewState.kind !== "call") {
@@ -642,28 +498,17 @@ export function App() {
     }
 
     setIsJoining(true);
-    setJoinError(null);
-    setJoinResult(null);
+      setJoinError(null);
+      setJoinResult(null);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/join`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          displayName,
-          qualityPreset: selectedQualityPreset,
-          requestedMedia: buildRequestedMedia(previewAudioEnabled, previewVideoEnabled),
-        }),
+      const payload = await joinRoomRequest({
+        apiBaseUrl,
+        displayName,
+        qualityPreset: selectedQualityPreset,
+        requestedMedia: buildRequestedMedia(previewAudioEnabled, previewVideoEnabled),
+        slug: viewState.slug,
       });
-
-      if (!response.ok) {
-        const payload = (await response.json()) as { message?: string };
-        throw new Error(payload.message ?? "Unable to join room");
-      }
-
-      const payload = (await response.json()) as JoinRoomResponse;
       setJoinResult(payload);
 
       if (payload.joinState === "direct") {
@@ -753,18 +598,11 @@ export function App() {
   }
 
   async function handleStartPreview() {
-    if (typeof navigator === "undefined" || navigator.mediaDevices?.getUserMedia == null) {
-      setPreviewState("error");
-      setPreviewError("This browser does not support live device preview.");
-      return;
-    }
-
     setPreviewState("requesting");
     setPreviewError(null);
 
     try {
-      const requestedMedia = buildRequestedMedia(previewAudioEnabled, previewVideoEnabled);
-      const stream = await navigator.mediaDevices.getUserMedia(buildPreviewConstraints(requestedMedia));
+      const stream = await startPreviewRequest(buildRequestedMedia(previewAudioEnabled, previewVideoEnabled));
       stopMediaStream(previewStreamRef.current);
       previewStreamRef.current = stream;
       setPreviewState("ready");
@@ -791,17 +629,13 @@ export function App() {
     setHostLobbyError(null);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/rooms/${viewState.slug}/lobby/${requestId}/${action}`, {
-        method: "POST",
-        headers: {
-          "x-host-secret": hostSecret,
-        },
+      await submitLobbyAction({
+        action,
+        apiBaseUrl,
+        hostSecret,
+        requestId,
+        slug: viewState.slug,
       });
-
-      if (!response.ok) {
-        const payload = (await response.json()) as { message?: string };
-        throw new Error(payload.message ?? `Unable to ${action} lobby request`);
-      }
 
       setHostLobbyRequests((current) => current.filter((entry) => entry.requestId !== requestId));
     } catch (error) {
