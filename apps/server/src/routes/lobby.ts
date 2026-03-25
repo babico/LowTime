@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { LobbyRequestStatusResponse, LobbyRequestSummary } from "@lowtime/shared";
 
+import { getRoomStatus } from "../domain/room-status.js";
 import {
-  getRoomStatus,
   hasValidHostSecret,
   type RouteContext,
 } from "../server-support.js";

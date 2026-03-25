@@ -1,11 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import type { MediaTokenRequest, MediaTokenResponse } from "@lowtime/shared";
 
+import { getRoomStatus } from "../domain/room-status.js";
+import { validateMediaTokenRequest } from "../domain/room-validation.js";
 import { issueSfuToken } from "../livekit.js";
 import {
-  getRoomStatus,
   type RouteContext,
-  validateMediaTokenRequest,
 } from "../server-support.js";
 
 export function registerMediaRoutes(app: FastifyInstance, context: RouteContext) {
