@@ -3,7 +3,7 @@
 - Purpose: Define the expected room lifecycle and user-visible flows from room creation through expiry.
 - Audience: Frontend and backend engineers, designers, QA.
 - Status: Baseline
-- Last Updated: 2026-03-24
+- Last Updated: 2026-03-25
 - Related Docs: [Product Overview](01-product-overview.md), [API And Realtime Contracts](05-api-and-realtime-contracts.md), [Data Model And Lifecycle](06-data-model-and-lifecycle.md)
 
 ## Overview
@@ -126,4 +126,6 @@ Expired --> [*]
 ## Implementation Notes
 - Join authorization must complete before media token issuance.
 - Guests should remain on the join screen until room admission is confirmed.
+- Current implementation supports a `/r/:slug/waiting/:requestId` route that polls lobby status until the host approves or denies the request.
+- Hosts can review pending lobby requests from the room page when the local browser still has the room host secret.
 - The reconnect window should preserve participant identity without creating duplicate live sessions.

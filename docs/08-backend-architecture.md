@@ -3,34 +3,59 @@
 - Purpose: Describe the server-side services, policy engine, signaling behavior, and failure handling for LowTime.
 - Audience: Backend and platform engineers.
 - Status: Baseline
-- Last Updated: 2026-03-24
+- Last Updated: 2026-03-25
 - Related Docs: [System Architecture](02-system-architecture.md), [API And Realtime Contracts](05-api-and-realtime-contracts.md), [Data Model And Lifecycle](06-data-model-and-lifecycle.md), [Security And Abuse](09-security-and-abuse.md)
 
 ## Overview
 The backend is a Fastify application exposing REST endpoints and a WebSocket signaling channel. It is responsible for room creation, admission checks, host validation, lobby handling, reconnect rules, media token issuance, and quality-cap enforcement.
 
+## Source Layout
+- `apps/server/src/index.ts`
+  - process entrypoint and server listen startup
+- `apps/server/src/app.ts`
+  - Fastify bootstrap, CORS registration, and route-module registration
+- `apps/server/src/routes/health.ts`
+  - healthcheck endpoint
+- `apps/server/src/routes/rooms.ts`
+  - room creation, room lookup, and join admission endpoints
+- `apps/server/src/routes/lobby.ts`
+  - lobby list, status, approve, and deny endpoints
+- `apps/server/src/routes/media.ts`
+  - media token issuance endpoint
+- `apps/server/src/domain/room-validation.ts`
+  - create/join/token request validation rules
+- `apps/server/src/domain/room-status.ts`
+  - room status calculation and public room summary projection
+- `apps/server/src/domain/room-store.ts`
+  - in-memory room store, session creation, and lobby request mutation logic
+- `apps/server/src/server-support.ts`
+  - route-context creation, runtime wiring, expiry helper, and host-secret validation
+- `apps/server/src/livekit.ts`
+  - LiveKit config loading and token signing
+- `apps/server/src/rooms.test.ts`
+  - room and join endpoint coverage
+- `apps/server/src/lobby.test.ts`
+  - lobby endpoint coverage
+- `apps/server/src/media.test.ts`
+  - media token endpoint coverage
+
 ## Service Responsibilities
-- `Room service`
+- `Route layer`
+  - translate HTTP requests into domain operations
+  - return stable API responses and error messages
+- `Room validation domain`
+  - enforce create, join, and token input rules
+- `Room status domain`
+  - decide whether a room is `created`, `active`, `expired`, or `closed`
+  - shape public room summaries
+- `Room store domain`
   - create rooms
-  - load room metadata
-  - update `last_activity_at`
-  - expire inactive rooms
-- `Access policy service`
-  - enforce open, lobby, and passcode rules
-  - enforce room size limits
-  - validate host secret
+  - create admitted sessions
+  - create, approve, deny, and list lobby requests
 - `Media token service`
-  - request signed LiveKit tokens
-  - prepare P2P fallback session state
-  - return ICE server configuration
-- `Signaling gateway`
-  - handle live room connection
-  - broadcast participant, chat, and settings events
-  - relay P2P SDP and ICE in fallback mode
-- `Reconnect service`
-  - manage recovery window and session restoration
-- `Cleanup worker`
-  - expire rooms and transient state
+  - sign LiveKit access tokens for admitted sessions
+- `App bootstrap layer`
+  - compose Fastify with shared runtime context and route modules
 
 ## Containerization Notes
 - The backend should ship as a Docker image and read all runtime configuration from environment variables.
@@ -65,9 +90,12 @@ A-->>C: room.snapshot
 - Host quality-cap changes are broadcast through signaling and applied live.
 
 ## Lobby Handling
-- Join requests to a lobby room create a Redis-backed waiting record.
-- Host receives `lobby.requested` through signaling.
-- Approval or denial removes the waiting record and emits the resulting event to the guest session.
+- Current implementation:
+  - join requests to a lobby room create an in-memory waiting record in the room store
+  - host polls lobby list/status over REST
+  - approval or denial updates that in-memory waiting record and surfaces the result through the status endpoint
+- Planned evolution:
+  - move waiting records into Redis-backed transient state when signaling and reconnect flows land
 
 ## Failure Handling
 - If Redis is unavailable, reject new joins and room setting changes cleanly rather than risking inconsistent live state.
@@ -86,8 +114,8 @@ A-->>C: room.snapshot
 - Host secret validation passes for an expired room unless expiry is checked first.
 
 ## Implementation Notes
-- Use Redis transactions or equivalent guards for participant-capacity races.
-- Separate room policy code from raw transport integration code to keep rules testable.
+- Current implementation keeps route modules separate from domain helpers so policy rules remain testable without route-level boilerplate.
+- The in-memory room store is intentionally isolated behind `RoomStore` so it can be swapped for Redis/PostgreSQL-backed implementations later.
 - Keep startup and healthcheck behavior container-friendly for Compose and later orchestration.
-- Record host actions as audit events for debugging and abuse review.
+- Record host actions as audit events for debugging and abuse review when persistent storage is introduced.
 - Current implementation signs LiveKit room tokens directly in the Fastify service for admitted sessions and returns them through `POST /api/rooms/:slug/token`.
