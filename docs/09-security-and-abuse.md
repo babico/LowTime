@@ -17,10 +17,13 @@ LowTime avoids account-based security controls, so link entropy, host-secret han
 - Allow the WebSocket `room.connect` event to include the host secret so the server can restore host role live.
 
 ## Passcode Handling
-- Store passcodes only as Argon2id hashes.
-- Compare passcodes on join before issuing media tokens.
-- Rate-limit repeated failures by IP and room slug.
-- Never echo passcodes back to the client or logs.
+- Store passcodes only as Argon2id hashes. The production baseline is `memoryCost` 19 MiB (19456 KiB), `timeCost` 2 iterations, `parallelism` 1, and a random 16-byte salt. `@node-rs/argon2` emits the encoded hash string these parameters produce.
+- Compare passcodes on join before issuing media tokens. The verify call delegates to the library's own constant-time comparison path.
+- Passcodes are 4 to 64 UTF-8 code points, case sensitive, no control characters, and no leading or trailing whitespace. The server rejects violations with an HTTP 400 that states the rule without echoing the submitted value.
+- Rate-limit repeated failures by `(client IP, room slug)`. The in-memory limiter trips at 5 failed attempts within a 5 minute sliding window and opens a 60 second cooldown during which passcode attempts from that pair are denied with `invalid_passcode` without invoking the verifier. The cooldown duration is not disclosed in the response body. Counters reset on a successful verification and on any settings-driven rotation or access-mode change.
+- In-memory scope: the limiter is per-process and resets on restart. For horizontally scaled deployments the limiter must move to shared storage (tracked with the Redis live room state work in Issue #33).
+- `trustProxy` is not enabled on Fastify today. Deployments behind a reverse proxy that sets `X-Forwarded-For` must enable `trustProxy` so `request.ip` reflects the client address used for rate-limit keys.
+- Never echo passcodes back to the client or logs. The plaintext is returned exactly once in the `CreateRoomResponse.passcode` field and never in any other REST response, settings response, or log line.
 
 ## Link And Room ID Policy
 - Use 12-character base58 room slugs.

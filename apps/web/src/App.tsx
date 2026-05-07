@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
+  AccessMode,
+  CreateRoomRequest,
   CreateRoomResponse,
   JoinRoomResponse,
   LobbyRequestStatusResponse,
@@ -34,14 +36,18 @@ import {
 } from "./room-entry.js";
 
 const DEFAULT_QUALITY_PRESET: QualityPreset = "balanced";
+const DEFAULT_ACCESS_MODE: AccessMode = "open";
 export function App() {
   const [viewState, setViewState] = useState(() => readViewState(window.location));
   const [createResult, setCreateResult] = useState<CreateRoomResponse | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedAccessMode, setSelectedAccessMode] = useState<AccessMode>(DEFAULT_ACCESS_MODE);
+  const [createPasscodeInput, setCreatePasscodeInput] = useState("");
 
   const [displayName, setDisplayName] = useState("");
   const [selectedQualityPreset, setSelectedQualityPreset] = useState<QualityPreset>(DEFAULT_QUALITY_PRESET);
+  const [joinPasscodeInput, setJoinPasscodeInput] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -197,6 +203,16 @@ export function App() {
     setJoinResult(null);
     setDisplayName("");
     setSelectedQualityPreset(DEFAULT_QUALITY_PRESET);
+    setJoinPasscodeInput("");
+  }, [viewState]);
+
+  // When the user navigates away from the home page, drop the in-memory
+  // plaintext passcode so it is not retained across route changes.
+  useEffect(() => {
+    if (viewState.kind !== "home") {
+      setCreateResult(null);
+      setCreatePasscodeInput("");
+    }
   }, [viewState]);
 
   async function handleCreateRoom() {
@@ -204,12 +220,19 @@ export function App() {
     setCreateError(null);
 
     try {
+      const requestBody: CreateRoomRequest = {
+        accessMode: selectedAccessMode,
+      };
+      if (selectedAccessMode === "passcode") {
+        requestBody.passcode = createPasscodeInput;
+      }
+
       const response = await fetch(`${apiBaseUrl}/api/rooms`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -220,6 +243,10 @@ export function App() {
       const payload = (await response.json()) as CreateRoomResponse;
       setCreateResult(payload);
       saveStoredHostSecret(window.localStorage, payload.roomSlug, payload.hostSecret);
+      // Clear the plaintext input as soon as we have the server response.
+      // The plaintext returned in `payload.passcode` lives only in
+      // `createResult` state and is cleared on navigation below.
+      setCreatePasscodeInput("");
     } catch (error) {
       setCreateResult(null);
       setCreateError(error instanceof Error ? error.message : "Unable to create room");
@@ -234,6 +261,14 @@ export function App() {
     }
 
     await navigator.clipboard.writeText(toAbsoluteJoinUrl(createResult.joinUrl, window.location));
+  }
+
+  async function handleCopyPasscode() {
+    if (createResult?.passcode == null) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(createResult.passcode);
   }
 
   function handleOpenRoom() {
@@ -257,6 +292,7 @@ export function App() {
       const payload = await joinRoomRequest({
         apiBaseUrl,
         displayName,
+        passcode: joinPasscodeInput.length > 0 ? joinPasscodeInput : undefined,
         qualityPreset: selectedQualityPreset,
         requestedMedia: previewRequestedMedia,
         slug: viewState.slug,
@@ -273,6 +309,7 @@ export function App() {
         });
 
         clearPreview();
+        setJoinPasscodeInput("");
         pushRoute(window.history, window.location, getCallPageRoute(viewState.slug), setViewState);
       } else if (payload.joinState === "waiting") {
         const storedRequest: StoredLobbyRequest = {
@@ -349,10 +386,21 @@ export function App() {
         isInstallingApp,
         isStandaloneApp,
         installMessage,
+        onAccessModeChange: (mode) => {
+          setSelectedAccessMode(mode);
+          if (mode !== "passcode") {
+            setCreatePasscodeInput("");
+          }
+        },
         onCopyLink: handleCopyLink,
+        onCopyPasscode: handleCopyPasscode,
         onCreateRoom: handleCreateRoom,
         onInstallApp: handleInstallApp,
         onOpenRoom: handleOpenRoom,
+        onPasscodeInputChange: setCreatePasscodeInput,
+        passcodeError: null,
+        passcodeInput: createPasscodeInput,
+        selectedAccessMode,
         shareUrl: createResult ? toAbsoluteJoinUrl(createResult.joinUrl, window.location) : null,
         showInstallPrompt,
       }}
@@ -383,10 +431,12 @@ export function App() {
         onDisplayNameChange: setDisplayName,
         onHostLobbyAction: handleHostLobbyAction,
         onJoinRoom: handleJoinRoom,
+        onPasscodeInputChange: setJoinPasscodeInput,
         onPreviewAudioChange: setPreviewAudioEnabled,
         onPreviewVideoChange: setPreviewVideoEnabled,
         onQualityPresetChange: setSelectedQualityPreset,
         onStartPreview: handleStartPreview,
+        passcodeInput: joinPasscodeInput,
         previewAudioEnabled,
         previewError,
         previewState,

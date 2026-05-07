@@ -260,3 +260,25 @@ test("POST /api/rooms/:slug/join denies when the room TTL has already expired", 
 
   await app.close();
 });
+
+
+test("POST /api/rooms ignores a stray passcode field for non-passcode rooms", async () => {
+  const app = buildApp();
+
+  for (const accessMode of ["open", "lobby"] as const) {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+      payload: { accessMode, passcode: "ignored-value" },
+    });
+
+    assert.equal(response.statusCode, 200, `expected 200 for ${accessMode}`);
+    const payload = response.json();
+    assert.equal(payload.passcode, undefined, `expected no echoed passcode for ${accessMode}`);
+    assert.equal(payload.room.accessMode, accessMode);
+    // `room` summary never carries a hash field for any mode.
+    assert.equal(payload.room.passcodeHash, undefined);
+  }
+
+  await app.close();
+});

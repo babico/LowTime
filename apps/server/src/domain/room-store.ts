@@ -10,6 +10,7 @@ import type {
 
 export interface StoredRoom extends RoomSummary {
   hostSecret: string;
+  passcodeHash: string | null;
   sessions: StoredSession[];
   lobbyRequests: StoredLobbyRequest[];
 }
@@ -20,6 +21,7 @@ export interface CreateStoredRoomInput {
   qualityCap: QualityCap;
   allowScreenShare: boolean;
   expiresAt: string;
+  passcodeHash?: string;
 }
 
 export interface StoredSession {
@@ -40,6 +42,8 @@ export interface StoredLobbyRequest {
 export interface RoomStore {
   createRoom(input: CreateStoredRoomInput): StoredRoom;
   getRoom(slug: RoomSlug): StoredRoom | undefined;
+  setPasscodeHash(slug: RoomSlug, hash: string): boolean;
+  clearPasscodeHash(slug: RoomSlug): boolean;
   createSession(roomSlug: RoomSlug, displayName: string): StoredSession | undefined;
   createLobbyRequest(roomSlug: RoomSlug, displayName: string, createdAt: string): StoredLobbyRequest | undefined;
   listLobbyRequests(roomSlug: RoomSlug): StoredLobbyRequest[];
@@ -68,6 +72,7 @@ export function createInMemoryRoomStore(): RoomStore {
         status: "created",
         expiresAt: input.expiresAt,
         hostSecret: createHostSecret(),
+        passcodeHash: input.passcodeHash ?? null,
         sessions: [],
         lobbyRequests: [],
       };
@@ -78,6 +83,22 @@ export function createInMemoryRoomStore(): RoomStore {
     },
     getRoom(slug) {
       return rooms.get(slug);
+    },
+    setPasscodeHash(slug, hash) {
+      const room = rooms.get(slug);
+      if (room == null) {
+        return false;
+      }
+      room.passcodeHash = hash;
+      return true;
+    },
+    clearPasscodeHash(slug) {
+      const room = rooms.get(slug);
+      if (room == null) {
+        return false;
+      }
+      room.passcodeHash = null;
+      return true;
     },
     createSession(roomSlug, displayName) {
       const room = rooms.get(roomSlug);

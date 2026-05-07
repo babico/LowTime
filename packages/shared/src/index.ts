@@ -35,6 +35,7 @@ export interface CreateRoomRequest {
   maxParticipants?: number;
   qualityCap?: QualityCap;
   allowScreenShare?: boolean;
+  passcode?: string;
 }
 
 export interface CreateRoomResponse {
@@ -42,6 +43,16 @@ export interface CreateRoomResponse {
   joinUrl: string;
   hostSecret: string;
   expiresAt: string;
+  room: RoomSummary;
+  passcode?: string;
+}
+
+export interface UpdateRoomSettingsRequest {
+  accessMode?: AccessMode;
+  passcode?: string;
+}
+
+export interface UpdateRoomSettingsResponse {
   room: RoomSummary;
 }
 

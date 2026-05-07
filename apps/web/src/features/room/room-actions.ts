@@ -5,20 +5,27 @@ import { buildPreviewConstraints } from "../../device-preview.js";
 export async function joinRoomRequest(input: {
   apiBaseUrl: string;
   displayName: string;
+  passcode?: string;
   qualityPreset: QualityPreset;
   requestedMedia: RequestedMedia;
   slug: string;
 }): Promise<JoinRoomResponse> {
+  const body: Record<string, unknown> = {
+    displayName: input.displayName,
+    qualityPreset: input.qualityPreset,
+    requestedMedia: input.requestedMedia,
+  };
+
+  if (input.passcode != null && input.passcode.length > 0) {
+    body.passcode = input.passcode;
+  }
+
   const response = await fetch(`${input.apiBaseUrl}/api/rooms/${input.slug}/join`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      displayName: input.displayName,
-      qualityPreset: input.qualityPreset,
-      requestedMedia: input.requestedMedia,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
