@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerLobbyRoutes } from "./routes/lobby.js";
 import { registerMediaRoutes } from "./routes/media.js";
+import { registerReclaimRoutes } from "./routes/reclaim.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { createInMemoryRoomStore, type RoomStore } from "./domain/room-store.js";
@@ -29,6 +30,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   registerLobbyRoutes(app, context);
   registerMediaRoutes(app, context);
   registerSettingsRoutes(app, context);
+  registerReclaimRoutes(app, context);
 
   return app;
 }

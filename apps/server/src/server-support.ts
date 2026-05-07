@@ -10,6 +10,10 @@ import {
   type PasscodeRateLimiter,
 } from "./domain/passcode-rate-limiter.js";
 import {
+  createInMemoryReclaimRateLimiter,
+  type ReclaimRateLimiter,
+} from "./domain/reclaim-rate-limiter.js";
+import {
   createInMemoryRoomStore,
   type RoomStore,
   type StoredRoom,
@@ -23,6 +27,7 @@ export interface BuildAppOptions {
   liveKitConfig?: LiveKitConfig | null;
   passcodeVerifier?: PasscodeVerifier;
   passcodeRateLimiter?: PasscodeRateLimiter;
+  reclaimRateLimiter?: ReclaimRateLimiter;
   /**
    * Overrides the Fastify logger option used by `buildApp`. Primarily used by
    * tests that capture log output into an in-memory buffer. When omitted the
@@ -37,6 +42,7 @@ export interface RouteContext {
   roomStore: RoomStore;
   passcodeVerifier: PasscodeVerifier;
   passcodeRateLimiter: PasscodeRateLimiter;
+  reclaimRateLimiter: ReclaimRateLimiter;
 }
 
 export function createRouteContext(options: BuildAppOptions = {}): RouteContext {
@@ -46,6 +52,7 @@ export function createRouteContext(options: BuildAppOptions = {}): RouteContext 
     roomStore: options.roomStore ?? createInMemoryRoomStore(),
     passcodeVerifier: options.passcodeVerifier ?? createArgon2idPasscodeVerifier(),
     passcodeRateLimiter: options.passcodeRateLimiter ?? createInMemoryPasscodeRateLimiter(),
+    reclaimRateLimiter: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
   };
 }
 

@@ -282,3 +282,28 @@ test("POST /api/rooms ignores a stray passcode field for non-passcode rooms", as
 
   await app.close();
 });
+
+
+test("POST /api/rooms continues to issue a host secret after the reclaim route is registered", async () => {
+  const app = buildApp();
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+  });
+  assert.equal(createResponse.statusCode, 200);
+  const { roomSlug, hostSecret } = createResponse.json();
+  assert.equal(typeof hostSecret, "string");
+  assert.ok(hostSecret.length > 0);
+
+  // The existing settings endpoint still accepts the x-host-secret header.
+  const settingsResponse = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/settings`,
+    headers: { "x-host-secret": hostSecret },
+    payload: { accessMode: "open" },
+  });
+  assert.equal(settingsResponse.statusCode, 200);
+
+  await app.close();
+});

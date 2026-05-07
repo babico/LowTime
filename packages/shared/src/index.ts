@@ -56,6 +56,11 @@ export interface UpdateRoomSettingsResponse {
   room: RoomSummary;
 }
 
+export interface ReclaimRoomResponse {
+  room: RoomSummary;
+  lobbyRequests: LobbyRequestSummary[];
+}
+
 export interface JoinRoomRequest {
   displayName: string;
   passcode?: string;

@@ -128,4 +128,5 @@ Expired --> [*]
 - Guests should remain on the join screen until room admission is confirmed.
 - Current implementation supports a `/r/:slug/waiting/:requestId` route that polls lobby status until the host approves or denies the request.
 - Hosts can review pending lobby requests from the room page when the local browser still has the room host secret.
+- The host reclaim flow is currently REST-only via `POST /api/rooms/:slug/reclaim`. On room-page mount the web client silently validates the cached host secret with the server; on a 403 response the stale cache is cleared and the room page renders a paste-a-secret form in the Room Preview section. WebSocket-based reclaim via `room.connect` is deferred until signaling lands.
 - The reconnect window should preserve participant identity without creating duplicate live sessions.

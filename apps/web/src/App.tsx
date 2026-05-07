@@ -22,13 +22,12 @@ import { useCallFlow } from "./features/call/call-effects.js";
 import { useInstallPrompt } from "./features/home/install-effects.js";
 import { joinRoomRequest, submitLobbyAction } from "./features/room/room-actions.js";
 import { useDevicePreview } from "./features/room/preview-effects.js";
-import { useRoomPageData } from "./features/room/room-effects.js";
+import { useRoomPageData, useHostReclaim } from "./features/room/room-effects.js";
 import { useWaitingRoomState } from "./features/waiting/waiting-effects.js";
 import { assessNetworkHealth, type NetworkHealth } from "./network-health.js";
 import {
   clearStoredLobbyRequest,
   getApiBaseUrl,
-  loadStoredHostSecret,
   saveStoredHostSecret,
   saveStoredLobbyRequest,
   saveStoredCallSession,
@@ -58,10 +57,6 @@ export function App() {
       isOnline: typeof navigator === "undefined" ? true : navigator.onLine,
     }),
   );
-  const hostSecret = useMemo(
-    () => (viewState.kind === "home" ? null : loadStoredHostSecret(window.localStorage, viewState.slug)),
-    [viewState],
-  );
   const roomSlug = viewState.kind === "room" ? viewState.slug : null;
   const waitingSlug = viewState.kind === "waiting" ? viewState.slug : null;
   const waitingRequestId = viewState.kind === "waiting" ? viewState.requestId : null;
@@ -70,6 +65,21 @@ export function App() {
     () => getApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location),
     [],
   );
+  const [cachedHasRoomSummary, setCachedHasRoomSummary] = useState(false);
+  const hostReclaim = useHostReclaim({
+    apiBaseUrl,
+    slug: roomSlug,
+    storage: window.localStorage,
+    hasRoomSummary: cachedHasRoomSummary,
+  });
+  const effectiveHostSecret =
+    hostReclaim.status === "unlocked" ? hostReclaim.hostSecret : null;
+  const hostSecret = effectiveHostSecret;
+  const reclaimRoomPageProps = {
+    reclaimStatus: hostReclaim.status,
+    reclaimManualError: hostReclaim.manualError,
+    onSubmitReclaimSecret: hostReclaim.submitManualSecret,
+  } as const;
   const {
     hostLobbyError,
     hostLobbyRequests,
@@ -80,9 +90,21 @@ export function App() {
     setHostLobbyRequests,
   } = useRoomPageData({
     apiBaseUrl,
-    hostSecret,
+    hostSecret: effectiveHostSecret,
     slug: roomSlug,
   });
+
+  useEffect(() => {
+    setCachedHasRoomSummary(roomSummary != null);
+  }, [roomSummary]);
+
+  // Seed the lobby queue with the reclaim response so the host sees pending
+  // requests without waiting for the next polling tick.
+  useEffect(() => {
+    if (hostReclaim.status === "unlocked" && hostReclaim.lobbyRequests.length > 0) {
+      setHostLobbyRequests(hostReclaim.lobbyRequests);
+    }
+  }, [hostReclaim.status, hostReclaim.lobbyRequests, setHostLobbyRequests]);
   const waitingApprovalHandler = useCallback((
     request: StoredLobbyRequest,
     status: Extract<LobbyRequestStatusResponse, { status: "approved" }>,
@@ -423,7 +445,7 @@ export function App() {
         displayName,
         hostLobbyError,
         hostLobbyRequests,
-        hostSecret,
+        hostSecret: effectiveHostSecret,
         isJoining,
         isLoadingRoom,
         joinError,
@@ -446,6 +468,7 @@ export function App() {
         roomSummary,
         selectedQualityPreset,
         slug: viewState.kind === "room" ? viewState.slug : roomSlug ?? "",
+        ...reclaimRoomPageProps,
       }}
       viewState={viewState}
       waitingPageProps={{

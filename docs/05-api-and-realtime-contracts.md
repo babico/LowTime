@@ -17,10 +17,10 @@ The API controls room lifecycle and admission. WebSocket signaling handles live 
 | `GET` | `/api/rooms/:slug` | None | Fetch room metadata for the join screen |
 | `POST` | `/api/rooms/:slug/join` | None | Validate join request and return admission state |
 | `POST` | `/api/rooms/:slug/token` | Session-scoped join data | Issue SFU or P2P join credentials |
-| `POST` | `/api/rooms/:slug/settings` | `X-LowTime-Host-Secret` | Change access mode, quality cap, room size, or screen-share policy |
-| `POST` | `/api/rooms/:slug/lobby/:requestId/approve` | `X-LowTime-Host-Secret` | Approve a waiting guest |
-| `POST` | `/api/rooms/:slug/lobby/:requestId/deny` | `X-LowTime-Host-Secret` | Deny a waiting guest |
-| `POST` | `/api/rooms/:slug/reclaim` | `X-LowTime-Host-Secret` | Restore host role after refresh or reconnect |
+| `POST` | `/api/rooms/:slug/settings` | `x-host-secret` | Change access mode or rotate the passcode |
+| `POST` | `/api/rooms/:slug/lobby/:requestId/approve` | `x-host-secret` | Approve a waiting guest |
+| `POST` | `/api/rooms/:slug/lobby/:requestId/deny` | `x-host-secret` | Deny a waiting guest |
+| `POST` | `/api/rooms/:slug/reclaim` | `x-host-secret` | Restore host role after refresh or reconnect |
 
 ## Key Request And Response Shapes
 
@@ -243,6 +243,42 @@ Current implementation notes:
   - `POST /api/rooms/:slug/lobby/:requestId/approve` for host admission
   - `POST /api/rooms/:slug/lobby/:requestId/deny` for host denial
   - `POST /api/rooms/:slug/settings` for host-only access mode and passcode rotation
+  - `POST /api/rooms/:slug/reclaim` for host reclaim after refresh
+- HTTP header names are case-insensitive per RFC 7230. All host-only endpoints use the lowercase `x-host-secret` form in the table; clients may send any casing.
+
+### `POST /api/rooms/:slug/reclaim`
+Host-only via the `x-host-secret` header.
+
+Request body: none required.
+
+Response body (200):
+```json
+{
+  "room": {
+    "slug": "7Qn2kP9Zx4Lm",
+    "accessMode": "lobby",
+    "maxParticipants": 2,
+    "qualityCap": "balanced",
+    "allowScreenShare": true,
+    "status": "active",
+    "expiresAt": "2026-03-24T18:00:00Z"
+  },
+  "lobbyRequests": [
+    { "requestId": "req_abc", "displayName": "Guest A", "createdAt": "2026-03-24T16:50:00Z" }
+  ]
+}
+```
+
+Failure responses:
+- `403` with `{ "message": "Host secret is required" }` for a missing header, a wrong header, or an unknown room slug. The endpoint deliberately returns the same shape for all four cases to prevent enumeration.
+- `409` with `{ "message": "Room is no longer available" }` when the host secret is valid but the room has expired or closed.
+
+Current implementation notes:
+- `lobbyRequests` is always present. It carries the current pending-approval queue for a room whose `accessMode` is `lobby` and is an empty array otherwise.
+- The response body never includes the plaintext host secret, the plaintext passcode, or the passcode hash.
+- Reclaim is idempotent. It does not mutate `status`, `expiresAt`, `accessMode`, the passcode hash, sessions, the lobby queue, or the passcode rate limiter.
+- Repeated failures from the same `(client IP, room slug)` pair are rate-limited under the same profile as passcode verification: 5 failed attempts within a 5 minute sliding window open a 60 second cooldown during which reclaim attempts from that pair return `403` without invoking the host-secret check. Successful attempts reset the counter. Unknown-slug attempts never touch the limiter.
+- A future WebSocket `room.connect` path (carrying the host secret as a payload field) is documented in the WebSocket Signaling section below and will be revisited when signaling lands.
 
 ### `POST /api/rooms/:slug/settings`
 Host-only via the `x-host-secret` header. The request body must change at least one of `accessMode` or `passcode`.

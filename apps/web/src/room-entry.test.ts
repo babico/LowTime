@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildRequestedMedia,
   clearStoredCallSession,
+  clearStoredHostSecret,
   clearStoredLobbyRequest,
   getApiBaseUrl,
   getCallRoute,
@@ -126,4 +127,30 @@ test("stored lobby requests and host secret round-trip cleanly", () => {
 
   clearStoredLobbyRequest(mockStorage, "Room123");
   assert.equal(loadStoredLobbyRequest(mockStorage, "Room123"), null);
+});
+
+
+test("clearStoredHostSecret removes the host secret and is a no-op for missing keys", () => {
+  const storage = new Map<string, string>();
+  const mockStorage = {
+    getItem(key: string) {
+      return storage.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      storage.set(key, value);
+    },
+    removeItem(key: string) {
+      storage.delete(key);
+    },
+  } as Storage;
+
+  saveStoredHostSecret(mockStorage, "Room456", "host_secret_xyz");
+  assert.equal(loadStoredHostSecret(mockStorage, "Room456"), "host_secret_xyz");
+
+  clearStoredHostSecret(mockStorage, "Room456");
+  assert.equal(loadStoredHostSecret(mockStorage, "Room456"), null);
+
+  // No-op for a slug that has no cached secret.
+  clearStoredHostSecret(mockStorage, "RoomDoesNotExist");
+  assert.equal(loadStoredHostSecret(mockStorage, "RoomDoesNotExist"), null);
 });

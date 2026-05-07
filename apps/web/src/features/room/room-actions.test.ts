@@ -104,3 +104,124 @@ test("joinRoomRequest never writes passcode to any passed-in storage", async () 
   }));
   assert.equal(signatureFields.has("storage"), false);
 });
+
+
+import { reclaimHostRole } from "./room-actions.js";
+
+function createReclaimStub(
+  status: number,
+  body: unknown,
+): { stub: typeof fetch; calls: Array<{ url: string; headers: Record<string, string> }> } {
+  const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+  const stub = async (url: string, init?: RequestInit) => {
+    const headers: Record<string, string> = {};
+    if (init?.headers) {
+      for (const [key, value] of Object.entries(init.headers as Record<string, string>)) {
+        headers[key.toLowerCase()] = value;
+      }
+    }
+    calls.push({ url, headers });
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      async json() {
+        return body;
+      },
+    } as unknown as Response;
+  };
+  return { stub: stub as unknown as typeof fetch, calls };
+}
+
+test("reclaimHostRole sends x-host-secret header and returns ok on 200", async () => {
+  const { stub, calls } = createReclaimStub(200, {
+    room: {
+      slug: "Room123",
+      accessMode: "open",
+      maxParticipants: 2,
+      qualityCap: "balanced",
+      allowScreenShare: true,
+      status: "created",
+      expiresAt: "2026-03-24T18:00:00Z",
+    },
+    lobbyRequests: [],
+  });
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = stub;
+
+  try {
+    const outcome = await reclaimHostRole({
+      apiBaseUrl: "http://localhost:3000",
+      hostSecret: "secret-xyz",
+      slug: "Room123",
+    });
+
+    assert.equal(outcome.kind, "ok");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "http://localhost:3000/api/rooms/Room123/reclaim");
+    assert.equal(calls[0].headers["x-host-secret"], "secret-xyz");
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("reclaimHostRole returns 'unauthorized' on 403", async () => {
+  const { stub } = createReclaimStub(403, { message: "Host secret is required" });
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = stub;
+
+  try {
+    const outcome = await reclaimHostRole({
+      apiBaseUrl: "http://localhost:3000",
+      hostSecret: "bad",
+      slug: "Room123",
+    });
+    assert.equal(outcome.kind, "unauthorized");
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("reclaimHostRole returns 'unavailable' on 409", async () => {
+  const { stub } = createReclaimStub(409, { message: "Room is no longer available" });
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = stub;
+
+  try {
+    const outcome = await reclaimHostRole({
+      apiBaseUrl: "http://localhost:3000",
+      hostSecret: "secret",
+      slug: "Room123",
+    });
+    assert.equal(outcome.kind, "unavailable");
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("reclaimHostRole returns 'error' with a default message on non-parseable bodies", async () => {
+  const stub = async () => {
+    return {
+      ok: false,
+      status: 500,
+      async json() {
+        throw new Error("parse error");
+      },
+    } as unknown as Response;
+  };
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = stub as unknown as typeof fetch;
+
+  try {
+    const outcome = await reclaimHostRole({
+      apiBaseUrl: "http://localhost:3000",
+      hostSecret: "secret",
+      slug: "Room123",
+    });
+    assert.equal(outcome.kind, "error");
+    if (outcome.kind === "error") {
+      assert.ok(outcome.message.length > 0);
+    }
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
