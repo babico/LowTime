@@ -47,7 +47,7 @@
 | --- | --- | --- | --- |
 | Lobby mode | `done` | Issue #11. Added pending lobby requests, host approval and denial endpoints, a waiting route, and host-side queue controls in the room screen | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Passcode-protected rooms | `done` | Issue #12. Added Argon2id hash storage, join-time verification, `(IP, slug)` rate limiter, host-only settings endpoint for rotation, and access-mode + passcode UI on create and join screens | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
-| Host reclaim after refresh | `planned` | Restore host role from host secret | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+| Host reclaim after refresh | `done` | Issue #13. Added `POST /api/rooms/:slug/reclaim` with dedicated `(IP, slug)` rate limiter, `useHostReclaim` hook that silently validates cached host secrets on room-page mount, and a paste-a-secret form for hosts without a cached credential | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Reconnect window and session recovery | `planned` | Preserve identity during short disconnects | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 | Room expiry and cleanup jobs | `planned` | Expire inactive rooms and trim transient state | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 

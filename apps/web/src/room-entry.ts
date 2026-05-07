@@ -173,6 +173,10 @@ export function loadStoredHostSecret(storage: Storage, slug: string): string | n
   return value == null || value.trim() === "" ? null : value;
 }
 
+export function clearStoredHostSecret(storage: Storage, slug: string) {
+  storage.removeItem(getStoredHostSecretKey(slug));
+}
+
 function getStoredCallSessionKey(slug: string): string {
   return `lowtime:call:${slug}`;
 }

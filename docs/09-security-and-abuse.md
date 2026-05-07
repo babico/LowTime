@@ -25,6 +25,13 @@ LowTime avoids account-based security controls, so link entropy, host-secret han
 - `trustProxy` is not enabled on Fastify today. Deployments behind a reverse proxy that sets `X-Forwarded-For` must enable `trustProxy` so `request.ip` reflects the client address used for rate-limit keys.
 - Never echo passcodes back to the client or logs. The plaintext is returned exactly once in the `CreateRoomResponse.passcode` field and never in any other REST response, settings response, or log line.
 
+## Reclaim Rate Limiting
+- `POST /api/rooms/:slug/reclaim` validates the submitted host secret against the stored secret. Repeated failures from the same `(client IP, room slug)` pair are throttled: 5 failures within a 5 minute sliding window open a 60 second cooldown during which any reclaim attempt from that pair is denied with a generic 403 without invoking the host-secret comparison.
+- Failures on unknown room slugs are **not** recorded by the limiter. This is a deliberate anti-enumeration guard so a bot scanning random slugs cannot lock out legitimate callers on real rooms.
+- The reclaim limiter is a separate in-process component from the passcode limiter. Settings-driven passcode rotations do not clear reclaim-failure state, and vice versa.
+- Like the passcode limiter, the reclaim limiter is per-process and resets on restart; `trustProxy` must be enabled when the Fastify app sits behind a reverse proxy so `request.ip` reflects the client.
+- Cooldown state is never disclosed: the 403 response body is the same generic `"Host secret is required"` whether the secret is missing, wrong, or the caller is inside a cooldown.
+
 ## Link And Room ID Policy
 - Use 12-character base58 room slugs.
 - Treat the room link as public but unguessable.

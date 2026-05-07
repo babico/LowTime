@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import type { RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent, RefObject } from "react";
 
 import type { JoinRoomResponse, LobbyRequestSummary, QualityPreset, RoomSummary } from "@lowtime/shared";
 
@@ -35,6 +35,9 @@ interface RoomPageProps {
   previewState: PreviewState;
   previewVideoEnabled: boolean;
   previewVideoRef: RefObject<HTMLVideoElement | null>;
+  reclaimStatus: "idle" | "checking" | "unlocked" | "needs-secret" | "unavailable";
+  reclaimManualError: string | null;
+  onSubmitReclaimSecret: (value: string) => Promise<void>;
   roomError: string | null;
   roomSummary: RoomSummary | null;
   selectedQualityPreset: QualityPreset;
@@ -211,7 +214,7 @@ export function RoomPage(props: RoomPageProps) {
               </p>
             ) : null}
           </section>
-          {props.roomSummary.accessMode === "lobby" && props.hostSecret ? (
+          {props.roomSummary.accessMode === "lobby" && props.hostSecret && props.reclaimStatus === "unlocked" ? (
             <section style={previewCardStyle}>
               <div style={tileHeaderStyle}>
                 <h2 style={tileHeadingStyle}>Host Lobby Queue</h2>
@@ -244,8 +247,79 @@ export function RoomPage(props: RoomPageProps) {
               {props.hostLobbyError ? <p role="alert">{props.hostLobbyError}</p> : null}
             </section>
           ) : null}
+          {props.reclaimStatus === "unavailable" ? (
+            <section style={previewCardStyle}>
+              <p role="alert">This room is no longer available.</p>
+            </section>
+          ) : null}
+          {props.reclaimStatus === "needs-secret" ? (
+            <ManualReclaimForm
+              manualError={props.reclaimManualError}
+              onSubmit={props.onSubmitReclaimSecret}
+            />
+          ) : null}
         </>
       ) : null}
     </main>
+  );
+}
+
+function ManualReclaimForm(props: {
+  manualError: string | null;
+  onSubmit: (value: string) => Promise<void>;
+}) {
+  const [secret, setSecret] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const disabled = secret.trim().length === 0 || isSubmitting;
+
+  useEffect(() => {
+    if (props.manualError != null && inputRef.current != null) {
+      inputRef.current.focus();
+    }
+  }, [props.manualError]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (disabled) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await props.onSubmit(secret);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <section style={previewCardStyle}>
+      <form onSubmit={handleSubmit} aria-labelledby="reclaim-heading">
+        <h2 id="reclaim-heading" style={tileHeadingStyle}>
+          Reclaim host role
+        </h2>
+        <p style={mutedParagraphStyle}>
+          Paste the host secret you were shown when the room was created.
+        </p>
+        <label>
+          Host secret
+          <input
+            ref={inputRef}
+            type="password"
+            value={secret}
+            onChange={(event) => setSecret(event.target.value)}
+            placeholder="Paste host secret"
+            autoComplete="off"
+          />
+        </label>
+        <div>
+          <button type="submit" disabled={disabled}>
+            {isSubmitting ? "Reclaiming..." : "Reclaim Host Role"}
+          </button>
+        </div>
+        {props.manualError ? <p role="alert">{props.manualError}</p> : null}
+      </form>
+    </section>
   );
 }
