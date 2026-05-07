@@ -109,7 +109,7 @@ Expired --> [*]
 ## Access Modes
 - `open`: Guests join directly if the room is not full and not expired.
 - `lobby`: Guests wait for host approval before token issuance.
-- `passcode`: Guests must provide a valid passcode before direct join or lobby placement.
+- `passcode`: Guests must provide a valid passcode. A correct passcode admits the guest directly (same flow as `open`). Layering passcode with lobby approval is deferred to a future release.
 
 ## Edge Cases
 - Guest opens the link before the host has joined the room.

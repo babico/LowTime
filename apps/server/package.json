@@ -13,12 +13,14 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
-    "fastify": "^5.2.1",
     "@lowtime/shared": "^0.1.0",
+    "@node-rs/argon2": "^2.0.2",
+    "fastify": "^5.2.1",
     "livekit-server-sdk": "^2.13.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "fast-check": "^4.7.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }

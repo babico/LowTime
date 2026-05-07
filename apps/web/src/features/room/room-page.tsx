@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 
 import type { JoinRoomResponse, LobbyRequestSummary, QualityPreset, RoomSummary } from "@lowtime/shared";
@@ -28,6 +29,7 @@ interface RoomPageProps {
   isLoadingRoom: boolean;
   joinError: string | null;
   joinResult: JoinRoomResponse | null;
+  passcodeInput: string;
   previewAudioEnabled: boolean;
   previewError: string | null;
   previewState: PreviewState;
@@ -40,13 +42,49 @@ interface RoomPageProps {
   onDisplayNameChange: (value: string) => void;
   onHostLobbyAction: (requestId: string, action: "approve" | "deny") => Promise<void>;
   onJoinRoom: () => Promise<void>;
+  onPasscodeInputChange: (value: string) => void;
   onPreviewAudioChange: (checked: boolean) => void;
   onPreviewVideoChange: (checked: boolean) => void;
   onQualityPresetChange: (value: QualityPreset) => void;
   onStartPreview: () => Promise<void>;
 }
 
+/**
+ * Derives the user-visible passcode error from the current join response.
+ * Returns null when there is no relevant error to show.
+ */
+export function derivePasscodeDeniedMessage(
+  joinResult: JoinRoomResponse | null,
+): string | null {
+  if (joinResult?.joinState !== "denied") {
+    return null;
+  }
+  if (joinResult.reason === "passcode_required") {
+    return "Passcode is required for this room.";
+  }
+  if (joinResult.reason === "invalid_passcode") {
+    return "That passcode is incorrect.";
+  }
+  return null;
+}
+
 export function RoomPage(props: RoomPageProps) {
+  const passcodeInputRef = useRef<HTMLInputElement | null>(null);
+  const passcodeDeniedMessage = derivePasscodeDeniedMessage(props.joinResult);
+  const needsPasscodeInput = props.roomSummary?.accessMode === "passcode";
+  const joinButtonDisabled =
+    props.isJoining ||
+    props.displayName.trim().length === 0 ||
+    (needsPasscodeInput && props.passcodeInput.trim().length === 0);
+
+  // When the server rejects the join for a passcode reason, refocus the input
+  // so the user can correct it without reaching for the mouse.
+  useEffect(() => {
+    if (passcodeDeniedMessage != null && passcodeInputRef.current != null) {
+      passcodeInputRef.current.focus();
+    }
+  }, [passcodeDeniedMessage]);
+
   return (
     <main>
       <h1>LowTime</h1>
@@ -138,18 +176,36 @@ export function RoomPage(props: RoomPageProps) {
                 placeholder="Enter your name"
               />
             </label>
+            {needsPasscodeInput ? (
+              <label>
+                Passcode
+                <input
+                  ref={passcodeInputRef}
+                  type="password"
+                  value={props.passcodeInput}
+                  onChange={(event) => props.onPasscodeInputChange(event.target.value)}
+                  placeholder="Enter the room passcode"
+                  autoComplete="off"
+                />
+              </label>
+            ) : null}
             <div>
-              <button type="button" onClick={() => void props.onJoinRoom()} disabled={props.isJoining}>
+              <button type="button" onClick={() => void props.onJoinRoom()} disabled={joinButtonDisabled}>
                 {props.isJoining ? "Joining..." : "Join Room"}
               </button>
             </div>
             {props.joinError ? <p role="alert">{props.joinError}</p> : null}
+            {passcodeDeniedMessage != null ? (
+              <p role="alert">{passcodeDeniedMessage}</p>
+            ) : null}
             {props.joinResult?.joinState === "waiting" ? (
               <p>
                 Waiting for host approval. Request <code>{props.joinResult.requestId}</code> is queued.
               </p>
             ) : null}
-            {props.joinResult?.joinState === "denied" ? (
+            {props.joinResult?.joinState === "denied" &&
+            props.joinResult.reason !== "passcode_required" &&
+            props.joinResult.reason !== "invalid_passcode" ? (
               <p>
                 Join denied: <strong>{props.joinResult.reason}</strong>
               </p>

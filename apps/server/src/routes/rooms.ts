@@ -1,5 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import type { CreateRoomRequest, CreateRoomResponse, JoinRoomRequest, JoinRoomResponse, RoomSummary } from "@lowtime/shared";
+import type {
+  CreateRoomRequest,
+  CreateRoomResponse,
+  JoinRoomRequest,
+  JoinRoomResponse,
+  RoomSummary,
+} from "@lowtime/shared";
 
 import { toRoomSummary, getRoomStatus } from "../domain/room-status.js";
 import { validateCreateRoomRequest, validateJoinRoomRequest } from "../domain/room-validation.js";
@@ -22,18 +28,29 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
         };
       }
 
+      const { passcode: plainPasscode, ...storeInput } = validation.value;
+      const passcodeHash =
+        plainPasscode != null ? await context.passcodeVerifier.hash(plainPasscode) : undefined;
+
       const room = context.roomStore.createRoom({
-        ...validation.value,
+        ...storeInput,
         expiresAt: createRoomExpiry(context.now()),
+        passcodeHash,
       });
 
-      return {
+      const responseBody: CreateRoomResponse = {
         roomSlug: room.slug,
         joinUrl: `/r/${room.slug}`,
         hostSecret: room.hostSecret,
         expiresAt: room.expiresAt,
         room: toRoomSummary(room, context.now()),
       };
+
+      if (plainPasscode != null) {
+        responseBody.passcode = plainPasscode;
+      }
+
+      return responseBody;
     },
   );
 
@@ -91,14 +108,45 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
       }
 
       if (room.accessMode === "passcode") {
-        return {
-          joinState: "denied",
-          reason: validation.value.passcode == null ? "passcode_required" : "invalid_passcode",
-        };
+        const submittedPasscode = validation.value.passcode;
+        if (submittedPasscode == null || submittedPasscode === "") {
+          return {
+            joinState: "denied",
+            reason: "passcode_required",
+          };
+        }
+
+        const key = { clientIp: request.ip, slug: room.slug };
+
+        if (!context.passcodeRateLimiter.shouldAllow(key)) {
+          return {
+            joinState: "denied",
+            reason: "invalid_passcode",
+          };
+        }
+
+        const match =
+          room.passcodeHash != null &&
+          (await context.passcodeVerifier.verify(room.passcodeHash, submittedPasscode));
+
+        if (!match) {
+          context.passcodeRateLimiter.recordFailure(key);
+          return {
+            joinState: "denied",
+            reason: "invalid_passcode",
+          };
+        }
+
+        context.passcodeRateLimiter.recordSuccess(key);
+        // Fall through to the direct-session admission path below.
       }
 
       if (room.accessMode === "lobby") {
-        const lobbyRequest = context.roomStore.createLobbyRequest(room.slug, validation.value.displayName, context.now().toISOString());
+        const lobbyRequest = context.roomStore.createLobbyRequest(
+          room.slug,
+          validation.value.displayName,
+          context.now().toISOString(),
+        );
 
         if (lobbyRequest == null) {
           return {

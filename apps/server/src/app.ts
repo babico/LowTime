@@ -5,6 +5,7 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerLobbyRoutes } from "./routes/lobby.js";
 import { registerMediaRoutes } from "./routes/media.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
+import { registerSettingsRoutes } from "./routes/settings.js";
 import { createInMemoryRoomStore, type RoomStore } from "./domain/room-store.js";
 import {
   createRouteContext,
@@ -13,7 +14,7 @@ import {
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({
-    logger: true,
+    logger: options.logger ?? true,
   });
 
   const context = createRouteContext(options);
@@ -27,6 +28,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   registerRoomRoutes(app, context);
   registerLobbyRoutes(app, context);
   registerMediaRoutes(app, context);
+  registerSettingsRoutes(app, context);
 
   return app;
 }

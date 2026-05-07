@@ -28,7 +28,8 @@ The API controls room lifecycle and admission. WebSocket signaling handles live 
 Request body:
 ```json
 {
-  "accessMode": "open",
+  "accessMode": "passcode",
+  "passcode": "blue-falcon-42",
   "maxParticipants": 2,
   "qualityCap": "balanced",
   "allowScreenShare": true
@@ -41,15 +42,24 @@ Response body:
   "roomSlug": "7Qn2kP9Zx4Lm",
   "joinUrl": "/r/7Qn2kP9Zx4Lm",
   "hostSecret": "base64url-secret",
+  "passcode": "blue-falcon-42",
   "expiresAt": "2026-03-24T18:00:00Z",
   "room": {
-    "accessMode": "open",
+    "slug": "7Qn2kP9Zx4Lm",
+    "accessMode": "passcode",
     "maxParticipants": 2,
     "qualityCap": "balanced",
-    "allowScreenShare": true
+    "allowScreenShare": true,
+    "status": "created",
+    "expiresAt": "2026-03-24T18:00:00Z"
   }
 }
 ```
+
+Current implementation notes:
+- The `passcode` request field is required when `accessMode` is `passcode` and is ignored for any other access mode. Passcodes must be 4 to 64 UTF-8 code points with no control characters and no leading or trailing whitespace.
+- The `passcode` response field is only present when the created room uses `accessMode` `passcode`. The plaintext is returned exactly once. The server stores only an Argon2id hash.
+- The nested `room` summary never includes the passcode plaintext or hash.
 
 ### `GET /api/rooms/:slug`
 Response body:
@@ -105,7 +115,9 @@ Response variants:
 Current implementation notes:
 - `open` rooms return `direct` with a generated `sessionId` and `transportPreference` of `sfu`.
 - `lobby` rooms return `waiting` with a generated `requestId`.
-- `passcode` rooms currently deny with `passcode_required` or `invalid_passcode` because passcode verification is not implemented yet.
+- `passcode` rooms verify the submitted `passcode` against the stored Argon2id hash. The server returns `{"joinState":"denied","reason":"passcode_required"}` when the body has no passcode, `{"joinState":"denied","reason":"invalid_passcode"}` when the passcode does not match, and the `direct` shape (same as `open` rooms) on a successful verification.
+- Repeated failures from the same `(client IP, room slug)` pair are throttled: 5 failed attempts within a 5 minute sliding window open a 60 second cooldown during which all passcode submissions from that pair return `invalid_passcode` without invoking the verifier. Neither the cooldown duration nor its existence is revealed in the response body.
+- The precedence of denial reasons is `room_expired` > `room_full` > `passcode_required` > `invalid_passcode`.
 
 ### `POST /api/rooms/:slug/token`
 Request body:
@@ -230,3 +242,42 @@ Current implementation notes:
   - `GET /api/rooms/:slug/lobby/:requestId` for guest waiting-room polling
   - `POST /api/rooms/:slug/lobby/:requestId/approve` for host admission
   - `POST /api/rooms/:slug/lobby/:requestId/deny` for host denial
+  - `POST /api/rooms/:slug/settings` for host-only access mode and passcode rotation
+
+### `POST /api/rooms/:slug/settings`
+Host-only via the `x-host-secret` header. The request body must change at least one of `accessMode` or `passcode`.
+
+Request body variants:
+```json
+{ "accessMode": "passcode", "passcode": "new-secret-9" }
+```
+
+```json
+{ "accessMode": "open" }
+```
+
+```json
+{ "passcode": "rotated-secret" }
+```
+
+Response body:
+```json
+{
+  "room": {
+    "slug": "7Qn2kP9Zx4Lm",
+    "accessMode": "passcode",
+    "maxParticipants": 2,
+    "qualityCap": "balanced",
+    "allowScreenShare": true,
+    "status": "created",
+    "expiresAt": "2026-03-24T18:00:00Z"
+  }
+}
+```
+
+Current implementation notes:
+- The settings response never echoes the new plaintext passcode. The host is expected to remember the value they just sent.
+- Transitioning to `accessMode = "passcode"` requires a non-empty `passcode` body that passes the same validation used at creation.
+- Transitioning away from `accessMode = "passcode"` clears the stored hash and ignores any submitted `passcode`.
+- A body with only `passcode` (no `accessMode`) is treated as a rotation and requires the room to already be in passcode mode.
+- Every accepted settings call clears the per-room rate limiter so a freshly-rotated passcode is not locked out by residual cooldown state.
