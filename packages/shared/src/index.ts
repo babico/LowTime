@@ -50,6 +50,7 @@ export interface CreateRoomResponse {
 export interface UpdateRoomSettingsRequest {
   accessMode?: AccessMode;
   passcode?: string;
+  qualityCap?: QualityCap;
 }
 
 export interface UpdateRoomSettingsResponse {
@@ -59,6 +60,39 @@ export interface UpdateRoomSettingsResponse {
 export interface ReclaimRoomResponse {
   room: RoomSummary;
   lobbyRequests: LobbyRequestSummary[];
+}
+
+/**
+ * Returns the highest preset a guest can publish given the host-imposed
+ * quality cap. The mapping is:
+ *
+ *   - `low`       → allows only `data_saver`
+ *   - `balanced`  → allows `data_saver` and `balanced`
+ *   - `high`      → allows all presets
+ *
+ * Guests may request any preset; this helper clamps their selection to the
+ * highest the host permits. Idempotent, total, and pure.
+ */
+export function clampPresetToCap(preset: QualityPreset, cap: QualityCap): QualityPreset {
+  const presetRank: Record<QualityPreset, number> = {
+    data_saver: 0,
+    balanced: 1,
+    best_quality: 2,
+  };
+  const capRank: Record<QualityCap, number> = {
+    low: 0,
+    balanced: 1,
+    high: 2,
+  };
+  if (presetRank[preset] <= capRank[cap]) {
+    return preset;
+  }
+  // Inverse lookup: highest preset whose rank equals the cap rank.
+  const allowedRank = capRank[cap];
+  const fallback = (Object.keys(presetRank) as QualityPreset[]).find(
+    (p) => presetRank[p] === allowedRank,
+  );
+  return fallback ?? "data_saver";
 }
 
 export interface JoinRoomRequest {

@@ -52,6 +52,12 @@ export function registerSettingsRoutes(app: FastifyInstance, context: RouteConte
 
     const decision = validation.value;
 
+    if (decision.kind === "set-quality-cap") {
+      room.qualityCap = decision.qualityCap;
+      recordRoomActivity(context.roomStore, room.slug, context.now());
+      return { room: toRoomSummary(room, context.now()) };
+    }
+
     if (decision.kind === "clear-passcode") {
       room.accessMode = decision.accessMode;
       context.roomStore.clearPasscodeHash(room.slug);

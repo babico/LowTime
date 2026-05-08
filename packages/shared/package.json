@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "lint": "eslint src --ext .ts --max-warnings=0",
+    "test": "node --import tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "exports": {
     ".": "./src/index.ts"
   },
   "devDependencies": {
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
 }

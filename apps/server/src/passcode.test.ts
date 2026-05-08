@@ -1633,3 +1633,105 @@ describe("Activity bumps from settings mutations", () => {
     await app.close();
   });
 });
+
+
+describe("Settings: qualityCap updates", () => {
+  async function setupOpenRoom() {
+    const store = createInMemoryRoomStore();
+    const verifier = createFakeVerifier();
+    let simulated = new Date("2026-03-24T12:00:00.000Z");
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      passcodeVerifier: verifier,
+      roomStore: store,
+      now: () => simulated,
+    });
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+    });
+    const { roomSlug, hostSecret } = createResponse.json() as {
+      roomSlug: string;
+      hostSecret: string;
+    };
+    return {
+      app,
+      store,
+      roomSlug,
+      hostSecret,
+      advance(ms: number) {
+        simulated = new Date(simulated.getTime() + ms);
+      },
+    };
+  }
+
+  test("successful qualityCap change returns the updated room summary", async () => {
+    const { app, store, roomSlug, hostSecret } = await setupOpenRoom();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/settings`,
+      headers: { "x-host-secret": hostSecret },
+      payload: { qualityCap: "low" },
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { room: { qualityCap: string } };
+    assert.equal(body.room.qualityCap, "low");
+    assert.equal(store.getRoom(roomSlug)?.qualityCap, "low");
+    await app.close();
+  });
+
+  test("invalid qualityCap value returns 400 with a descriptive message", async () => {
+    const { app, roomSlug, hostSecret } = await setupOpenRoom();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/settings`,
+      headers: { "x-host-secret": hostSecret },
+      payload: { qualityCap: "ultra" },
+    });
+
+    assert.equal(response.statusCode, 400);
+    const body = response.json() as { message: string };
+    assert.ok(/qualityCap/.test(body.message));
+    await app.close();
+  });
+
+  test("qualityCap change bumps lastActivityAt", async () => {
+    const { app, store, roomSlug, hostSecret, advance } = await setupOpenRoom();
+    const beforeBump = store.getRoom(roomSlug)?.lastActivityAt;
+
+    advance(15 * 60_000);
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/settings`,
+      headers: { "x-host-secret": hostSecret },
+      payload: { qualityCap: "balanced" },
+    });
+    assert.equal(response.statusCode, 200);
+
+    const afterBump = store.getRoom(roomSlug)?.lastActivityAt;
+    assert.ok(
+      beforeBump != null &&
+        afterBump != null &&
+        Date.parse(afterBump) > Date.parse(beforeBump),
+    );
+    await app.close();
+  });
+
+  test("settings call with only qualityCap does not require accessMode or passcode", async () => {
+    const { app, roomSlug, hostSecret } = await setupOpenRoom();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/settings`,
+      headers: { "x-host-secret": hostSecret },
+      payload: { qualityCap: "high" },
+    });
+
+    assert.equal(response.statusCode, 200);
+    await app.close();
+  });
+});

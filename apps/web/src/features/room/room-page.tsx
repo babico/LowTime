@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 
-import type { JoinRoomResponse, LobbyRequestSummary, QualityPreset, RoomSummary } from "@lowtime/shared";
+import type { JoinRoomResponse, LobbyRequestSummary, QualityCap, QualityPreset, RoomSummary } from "@lowtime/shared";
+import { clampPresetToCap } from "@lowtime/shared";
 
 import type { PreviewState } from "../../device-preview.js";
 import { getPreviewStateMessage, getQualityPresetLabel } from "../../device-preview.js";
@@ -53,6 +54,21 @@ interface RoomPageProps {
 }
 
 /**
+ * Returns the presets the current cap allows. Kept separate from
+ * `clampPresetToCap` so the room page can render a consistent dropdown.
+ */
+export function listAllowedPresets(cap: QualityCap): QualityPreset[] {
+  switch (cap) {
+    case "low":
+      return ["data_saver"];
+    case "balanced":
+      return ["data_saver", "balanced"];
+    case "high":
+      return ["data_saver", "balanced", "best_quality"];
+  }
+}
+
+/**
  * Derives the user-visible passcode error from the current join response.
  * Returns null when there is no relevant error to show.
  */
@@ -79,6 +95,13 @@ export function RoomPage(props: RoomPageProps) {
     props.isJoining ||
     props.displayName.trim().length === 0 ||
     (needsPasscodeInput && props.passcodeInput.trim().length === 0);
+
+  // Room-level quality cap may hide some preset options and may clamp the
+  // current selection. We compute the effective preset once per render and
+  // feed it back through the existing `selectedQualityPreset` prop.
+  const qualityCap: QualityCap = props.roomSummary?.qualityCap ?? "high";
+  const allowedPresets = listAllowedPresets(qualityCap);
+  const effectiveQualityPreset = clampPresetToCap(props.selectedQualityPreset, qualityCap);
 
   // When the server rejects the join for a passcode reason, refocus the input
   // so the user can correct it without reaching for the mouse.
@@ -156,12 +179,18 @@ export function RoomPage(props: RoomPageProps) {
                   <label style={toggleOptionStyle}>
                     Quality preset
                     <select
-                      value={props.selectedQualityPreset}
+                      value={effectiveQualityPreset}
                       onChange={(event) => props.onQualityPresetChange(event.target.value as QualityPreset)}
                     >
-                      <option value="data_saver">Data Saver</option>
-                      <option value="balanced">Balanced</option>
-                      <option value="best_quality">Best Quality</option>
+                      {allowedPresets.includes("data_saver") ? (
+                        <option value="data_saver">Data Saver</option>
+                      ) : null}
+                      {allowedPresets.includes("balanced") ? (
+                        <option value="balanced">Balanced</option>
+                      ) : null}
+                      {allowedPresets.includes("best_quality") ? (
+                        <option value="best_quality">Best Quality</option>
+                      ) : null}
                     </select>
                   </label>
                 </div>

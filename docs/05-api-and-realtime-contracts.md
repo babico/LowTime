@@ -296,6 +296,10 @@ Request body variants:
 { "passcode": "rotated-secret" }
 ```
 
+```json
+{ "qualityCap": "low" }
+```
+
 Response body:
 ```json
 {
@@ -316,4 +320,5 @@ Current implementation notes:
 - Transitioning to `accessMode = "passcode"` requires a non-empty `passcode` body that passes the same validation used at creation.
 - Transitioning away from `accessMode = "passcode"` clears the stored hash and ignores any submitted `passcode`.
 - A body with only `passcode` (no `accessMode`) is treated as a rotation and requires the room to already be in passcode mode.
+- A body with only `qualityCap` is accepted as a live room-cap change; values are restricted to `"low" | "balanced" | "high"`.
 - Every accepted settings call clears the per-room rate limiter so a freshly-rotated passcode is not locked out by residual cooldown state.

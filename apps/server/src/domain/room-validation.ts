@@ -150,18 +150,38 @@ export function validateUpdateSettingsRequest(input: UpdateRoomSettingsRequest):
   value:
     | { kind: "rotate"; passcode: string }
     | { kind: "set-passcode"; passcode: string }
-    | { kind: "clear-passcode"; accessMode: Exclude<AccessMode, "passcode"> };
+    | { kind: "clear-passcode"; accessMode: Exclude<AccessMode, "passcode"> }
+    | { kind: "set-quality-cap"; qualityCap: QualityCap };
 } | {
   ok: false;
   message: string;
 } {
   const hasAccessMode = input.accessMode !== undefined;
   const hasPasscode = input.passcode !== undefined;
+  const hasQualityCap = input.qualityCap !== undefined;
 
-  if (!hasAccessMode && !hasPasscode) {
+  if (!hasAccessMode && !hasPasscode && !hasQualityCap) {
     return {
       ok: false,
-      message: "settings update must change accessMode or passcode",
+      message: "settings update must change accessMode, passcode, or qualityCap",
+    };
+  }
+
+  if (hasQualityCap && !QUALITY_CAPS.includes(input.qualityCap as QualityCap)) {
+    return {
+      ok: false,
+      message: "qualityCap must be one of low, balanced, or high",
+    };
+  }
+
+  // A qualityCap-only change carries no access-mode or passcode intent.
+  if (hasQualityCap && !hasAccessMode && !hasPasscode) {
+    return {
+      ok: true,
+      value: {
+        kind: "set-quality-cap",
+        qualityCap: input.qualityCap as QualityCap,
+      },
     };
   }
 
