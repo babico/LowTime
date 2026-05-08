@@ -1,30 +1,45 @@
 import type { QualityPreset, RequestedMedia } from "@lowtime/shared";
 
+import { getPresetProfile } from "./quality-presets.js";
+
 export type PreviewState = "idle" | "requesting" | "ready" | "blocked" | "error";
 
-export function buildPreviewConstraints(requestedMedia: RequestedMedia): MediaStreamConstraints {
+const DEFAULT_PRESET: QualityPreset = "balanced";
+
+export function buildPreviewConstraints(
+  requestedMedia: RequestedMedia,
+  preset: QualityPreset = DEFAULT_PRESET,
+): MediaStreamConstraints {
+  if (!requestedMedia.video) {
+    return {
+      audio: requestedMedia.audio,
+      video: false,
+    };
+  }
+
+  const profile = getPresetProfile(preset);
   return {
     audio: requestedMedia.audio,
-    video: requestedMedia.video
-      ? {
-          width: { ideal: 640, max: 1280 },
-          height: { ideal: 360, max: 720 },
-          frameRate: { ideal: 15, max: 24 },
-          facingMode: "user",
-        }
-      : false,
+    video: {
+      width: {
+        ideal: profile.maxResolution.width,
+        max: Math.max(profile.maxResolution.width, 1280),
+      },
+      height: {
+        ideal: profile.maxResolution.height,
+        max: Math.max(profile.maxResolution.height, 720),
+      },
+      frameRate: {
+        ideal: profile.maxFps,
+        max: Math.max(profile.maxFps, 24),
+      },
+      facingMode: "user",
+    },
   };
 }
 
 export function getQualityPresetLabel(qualityPreset: QualityPreset): string {
-  switch (qualityPreset) {
-    case "data_saver":
-      return "Data Saver";
-    case "best_quality":
-      return "Best Quality";
-    default:
-      return "Balanced";
-  }
+  return getPresetProfile(qualityPreset).label;
 }
 
 export function getPreviewStateMessage(previewState: PreviewState, previewError: string | null): string {

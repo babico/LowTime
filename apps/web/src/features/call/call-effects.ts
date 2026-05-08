@@ -158,6 +158,7 @@ export function useCallFlow(input: UseCallFlowInput) {
         const room = await connectToSfu({
           credentials,
           requestedMedia: activeCallSession.requestedMedia,
+          qualityPreset: activeCallSession.qualityPreset,
         });
 
         if (cancelled) {

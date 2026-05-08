@@ -176,6 +176,7 @@ export function App() {
     setPreviewVideoEnabled,
   } = useDevicePreview({
     viewState,
+    qualityPreset: selectedQualityPreset,
   });
 
   useEffect(() => {

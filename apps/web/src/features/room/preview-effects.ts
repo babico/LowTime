@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { RequestedMedia } from "@lowtime/shared";
+import type { QualityPreset, RequestedMedia } from "@lowtime/shared";
 
 import { startPreviewRequest } from "./room-actions.js";
 import { stopMediaStream, type PreviewState } from "../../device-preview.js";
@@ -13,6 +13,7 @@ const DEFAULT_REQUESTED_MEDIA: RequestedMedia = {
 
 interface UseDevicePreviewInput {
   viewState: ViewState;
+  qualityPreset: QualityPreset;
 }
 
 export function useDevicePreview(input: UseDevicePreviewInput) {
@@ -66,10 +67,13 @@ export function useDevicePreview(input: UseDevicePreviewInput) {
     setPreviewError(null);
 
     try {
-      const stream = await startPreviewRequest({
-        audio: previewAudioEnabled,
-        video: previewVideoEnabled,
-      });
+      const stream = await startPreviewRequest(
+        {
+          audio: previewAudioEnabled,
+          video: previewVideoEnabled,
+        },
+        input.qualityPreset,
+      );
       stopMediaStream(previewStreamRef.current);
       previewStreamRef.current = stream;
       setPreviewState("ready");
