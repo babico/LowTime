@@ -715,6 +715,12 @@ describe("Property: expired-iff from expiresAt", () => {
           allowScreenShare: true,
           status: "active" as const,
           expiresAt: expiresAt.toISOString(),
+          hostSecret: "stub-host-secret",
+          passcodeHash: null,
+          sessions: [],
+          lobbyRequests: [],
+          lastActivityAt: new Date(expiresAtMs - ROOM_TTL_MS).toISOString(),
+          closedAt: null,
         };
 
         const status = getRoomStatus(room, now);
