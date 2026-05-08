@@ -107,7 +107,7 @@ export interface LobbyRequestStatusApprovedResponse {
 
 export interface LobbyRequestStatusDeniedResponse {
   status: "denied";
-  reason: "host_denied" | "room_expired" | "room_closed";
+  reason: "host_denied" | "room_expired" | "room_closed" | "lobby_timeout";
 }
 
 export type LobbyRequestStatusResponse =

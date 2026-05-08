@@ -630,19 +630,24 @@ describe("Rate Limiter: recovery (Property 4)", async () => {
 describe("Room store: passcode hash storage", async () => {
   const { createInMemoryRoomStore } = await import("./domain/room-store.js");
 
+  const testNow = new Date("2026-03-24T12:00:00Z");
+
   function baseInput() {
     return {
       accessMode: "passcode" as const,
       maxParticipants: 2,
       qualityCap: "balanced" as const,
       allowScreenShare: true,
-      expiresAt: new Date("2026-03-24T18:00:00Z").toISOString(),
+      initialActivity: testNow.toISOString(),
     };
   }
 
   test("createRoom stores the passcodeHash when provided", () => {
     const store = createInMemoryRoomStore();
-    const room = store.createRoom({ ...baseInput(), passcodeHash: "$argon2id$stub" });
+    const room = store.createRoom(
+      { ...baseInput(), passcodeHash: "$argon2id$stub" },
+      testNow,
+    );
     assert.equal(room.passcodeHash, "$argon2id$stub");
 
     const fetched = store.getRoom(room.slug);
@@ -651,13 +656,16 @@ describe("Room store: passcode hash storage", async () => {
 
   test("createRoom leaves passcodeHash null when not provided", () => {
     const store = createInMemoryRoomStore();
-    const room = store.createRoom({ ...baseInput(), accessMode: "open" });
+    const room = store.createRoom({ ...baseInput(), accessMode: "open" }, testNow);
     assert.equal(room.passcodeHash, null);
   });
 
   test("setPasscodeHash replaces the stored hash and returns true", () => {
     const store = createInMemoryRoomStore();
-    const room = store.createRoom({ ...baseInput(), passcodeHash: "$argon2id$old" });
+    const room = store.createRoom(
+      { ...baseInput(), passcodeHash: "$argon2id$old" },
+      testNow,
+    );
 
     const ok = store.setPasscodeHash(room.slug, "$argon2id$new");
     assert.equal(ok, true);
@@ -671,7 +679,10 @@ describe("Room store: passcode hash storage", async () => {
 
   test("clearPasscodeHash nulls the stored hash and returns true", () => {
     const store = createInMemoryRoomStore();
-    const room = store.createRoom({ ...baseInput(), passcodeHash: "$argon2id$stub" });
+    const room = store.createRoom(
+      { ...baseInput(), passcodeHash: "$argon2id$stub" },
+      testNow,
+    );
 
     const ok = store.clearPasscodeHash(room.slug);
     assert.equal(ok, true);
