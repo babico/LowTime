@@ -35,6 +35,8 @@ export function registerSignalRoutes(
 
       let unsubscribe: (() => void) | null = null;
       let connectReceived = false;
+      let connectedSlug = "";
+      let connectedSessionId = "";
 
       const safeSend = (event: SignalServerEvent) => {
         try {
@@ -99,6 +101,8 @@ export function registerSignalRoutes(
           }
 
           connectReceived = true;
+          connectedSlug = roomSlug;
+          connectedSessionId = sessionId;
           safeSend({
             kind: "room.snapshot",
             room: toRoomSummary(room, context.now()),
@@ -110,7 +114,29 @@ export function registerSignalRoutes(
           return;
         }
 
-        // Any subsequent message is currently unsupported. Send a soft error
+        // Handle room.ping heartbeat to keep the session alive.
+        if (payload.kind === "room.ping") {
+          const now = context.now();
+          const touched = context.roomStore.touchSession(connectedSlug, connectedSessionId, now);
+          if (!touched) {
+            // Session was reaped between connect and this ping.
+            safeSend({
+              kind: "error",
+              code: "session_expired",
+              message: "Session expired; rejoin the room",
+            });
+            try {
+              socket.close(1008, "Session expired");
+            } catch {
+              socket.terminate?.();
+            }
+            return;
+          }
+          safeSend({ kind: "room.pong", serverTime: now.toISOString() } as unknown as SignalServerEvent);
+          return;
+        }
+
+        // Any other subsequent message is currently unsupported. Send a soft error
         // frame but keep the socket open so clients can continue to receive
         // server-pushed events.
         safeSend({

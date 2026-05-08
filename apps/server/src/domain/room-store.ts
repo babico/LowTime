@@ -38,6 +38,8 @@ export interface CreateStoredRoomInput {
 export interface StoredSession {
   id: string;
   displayName: string;
+  /** ISO-8601 UTC. Set on creation and bumped on every successful token issuance and heartbeat. */
+  lastSeenAt: string;
 }
 
 export interface StoredLobbyRequest {
@@ -70,7 +72,14 @@ export interface RoomStore {
   ): boolean;
   setPasscodeHash(slug: RoomSlug, hash: string): boolean;
   clearPasscodeHash(slug: RoomSlug): boolean;
-  createSession(roomSlug: RoomSlug, displayName: string): StoredSession | undefined;
+  createSession(roomSlug: RoomSlug, displayName: string, now: Date): StoredSession | undefined;
+  /**
+   * Bumps `lastSeenAt` for an existing session. Returns `true` on success,
+   * `false` if the session is unknown (already reaped or never existed).
+   */
+  touchSession(slug: RoomSlug, sessionId: string, now: Date): boolean;
+  /** Removes the session and returns it, or `undefined` if not found. */
+  deleteSession(slug: RoomSlug, sessionId: string): StoredSession | undefined;
   createLobbyRequest(
     roomSlug: RoomSlug,
     displayName: string,
@@ -84,6 +93,7 @@ export interface RoomStore {
   approveLobbyRequest(
     roomSlug: RoomSlug,
     requestId: string,
+    now: Date,
   ): StoredLobbyRequest | undefined;
   denyLobbyRequest(
     roomSlug: RoomSlug,
@@ -169,7 +179,7 @@ export function createInMemoryRoomStore(): RoomStore {
       room.passcodeHash = null;
       return true;
     },
-    createSession(roomSlug, displayName) {
+    createSession(roomSlug, displayName, now) {
       const room = rooms.get(roomSlug);
 
       if (room == null || room.sessions.length >= room.maxParticipants) {
@@ -179,11 +189,28 @@ export function createInMemoryRoomStore(): RoomStore {
       const session: StoredSession = {
         id: createSessionId(),
         displayName,
+        lastSeenAt: now.toISOString(),
       };
 
       room.sessions.push(session);
 
       return session;
+    },
+    touchSession(slug, sessionId, now) {
+      const room = rooms.get(slug);
+      if (room == null) return false;
+      const session = room.sessions.find((s) => s.id === sessionId);
+      if (session == null) return false;
+      session.lastSeenAt = now.toISOString();
+      return true;
+    },
+    deleteSession(slug, sessionId) {
+      const room = rooms.get(slug);
+      if (room == null) return undefined;
+      const idx = room.sessions.findIndex((s) => s.id === sessionId);
+      if (idx === -1) return undefined;
+      const [removed] = room.sessions.splice(idx, 1);
+      return removed;
     },
     createLobbyRequest(roomSlug, displayName, createdAt) {
       const room = rooms.get(roomSlug);
@@ -216,7 +243,7 @@ export function createInMemoryRoomStore(): RoomStore {
     getLobbyRequest(roomSlug, requestId) {
       return rooms.get(roomSlug)?.lobbyRequests.find((entry) => entry.id === requestId);
     },
-    approveLobbyRequest(roomSlug, requestId) {
+    approveLobbyRequest(roomSlug, requestId, now) {
       const room = rooms.get(roomSlug);
       const request = room?.lobbyRequests.find((entry) => entry.id === requestId);
 
@@ -224,7 +251,7 @@ export function createInMemoryRoomStore(): RoomStore {
         return undefined;
       }
 
-      const session = this.createSession(roomSlug, request.displayName);
+      const session = this.createSession(roomSlug, request.displayName, now);
       if (session == null) {
         return undefined;
       }

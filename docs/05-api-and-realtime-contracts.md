@@ -154,6 +154,8 @@ Response variants:
 
 Current implementation notes:
 - `sessionId` must belong to an admitted room session before media credentials are issued.
+- If the room exists but the session has been reaped by the cleanup tick, the server returns `410 Gone` with `{ "message": "Session expired; rejoin the room" }`. The client should redirect the user to the join flow.
+- On a successful token issuance, the server bumps `lastSeenAt` on the session to keep it alive.
 - The server currently supports `sfu` token issuance and returns a retryable error when SFU credentials are not configured.
 - The web client currently uses the SFU response to enter `/r/:slug/call` and establish the first end-to-end media connection.
 
@@ -164,8 +166,10 @@ Current implementation notes:
 
 ### Currently Implemented
 - **Client → server**: `room.connect` with `{ kind: "room.connect", roomSlug, sessionId }` as the first frame. Any other first frame returns `{ kind: "error", code: "bad_connect" }` and closes the socket. Unknown slug or unknown `sessionId` returns `{ kind: "error", code: "unauthorized" }` and closes.
+- **Client → server**: `room.ping` with `{ kind: "room.ping" }` sent every 20 seconds while connected. The server bumps `lastSeenAt` on the session and replies with `{ kind: "room.pong", serverTime: <ISO-8601> }`. If the session has already been reaped, the server replies with `{ kind: "error", code: "session_expired", message: "Session expired; rejoin the room" }` and closes the socket.
 - **Server → client**: on a successful connect, the server immediately sends `{ kind: "room.snapshot", room: RoomSummary }`. While connected, every accepted `POST /api/rooms/:slug/settings` call fans out `{ kind: "room.settings_updated", room: RoomSummary }` to every subscribed socket on that slug.
-- **Server → client** error shape: `{ kind: "error", code, message }`.
+- **Server → client** `room.pong`: `{ kind: "room.pong", serverTime: <ISO-8601> }` in response to a `room.ping`. Clients treat this as a keep-alive acknowledgement and do not surface it to consumers.
+- **Server → client** error shape: `{ kind: "error", code, message }`. Known codes: `bad_message`, `bad_connect`, `unauthorized`, `unsupported_message`, `session_expired`.
 
 ### Deferred
 The event tables below enumerate the full planned signaling surface. Everything except `room.connect`, `room.snapshot`, `room.settings_updated`, and the `error` frame is still planned.

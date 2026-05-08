@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { RoomSummary } from "@lowtime/shared";
+import { RECONNECT_WINDOW_MS } from "@lowtime/shared";
 
 export type SignalState = "idle" | "connecting" | "connected" | "error" | "closed";
 
@@ -18,6 +19,8 @@ export interface UseRoomSignalingInput {
 export interface UseRoomSignalingState {
   signalState: SignalState;
   latestRoomSummary: RoomSummary | null;
+  /** True when the server has indicated the session has expired and the user must rejoin. */
+  sessionExpired: boolean;
 }
 
 /**
@@ -50,7 +53,12 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
 
   const [signalState, setSignalState] = useState<SignalState>("idle");
   const [latestRoomSummary, setLatestRoomSummary] = useState<RoomSummary | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Ping interval: 20s (well within the 5-minute reconnect window). */
+  const PING_INTERVAL_MS = Math.floor(RECONNECT_WINDOW_MS / 15);
 
   useEffect(() => {
     if (slug == null || sessionId == null) {
@@ -68,6 +76,26 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
     const socket = new WebSocket(url);
     socketRef.current = socket;
 
+    const stopPing = () => {
+      if (pingIntervalRef.current != null) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+    };
+
+    const startPing = () => {
+      stopPing();
+      pingIntervalRef.current = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          try {
+            socket.send(JSON.stringify({ kind: "room.ping" }));
+          } catch {
+            // Ignore; the close handler will clean up.
+          }
+        }
+      }, PING_INTERVAL_MS);
+    };
+
     socket.addEventListener("open", () => {
       try {
         socket.send(
@@ -81,12 +109,21 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
     socket.addEventListener("message", (event) => {
       try {
         const data = typeof event.data === "string" ? event.data : String(event.data);
-        const parsed = JSON.parse(data) as SignalServerEvent;
-        if (parsed.kind === "room.snapshot" || parsed.kind === "room.settings_updated") {
+        const raw = JSON.parse(data) as { kind: string; [key: string]: unknown };
+        if (raw.kind === "room.snapshot" || raw.kind === "room.settings_updated") {
+          const parsed = raw as unknown as SignalServerEvent & { room: RoomSummary };
           setSignalState("connected");
           setLatestRoomSummary(parsed.room);
-        } else if (parsed.kind === "error") {
+          // Start heartbeat once we're confirmed connected.
+          startPing();
+        } else if (raw.kind === "room.pong") {
+          // Server acknowledged our ping; session is still alive. No state change needed.
+        } else if (raw.kind === "error") {
+          if (raw.code === "session_expired") {
+            setSessionExpired(true);
+          }
           setSignalState("error");
+          stopPing();
         }
       } catch {
         // Drop unparseable frames; the next snapshot will re-hydrate state.
@@ -94,14 +131,17 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
     });
 
     socket.addEventListener("close", () => {
+      stopPing();
       setSignalState((prev) => (prev === "error" ? prev : "closed"));
     });
 
     socket.addEventListener("error", () => {
+      stopPing();
       setSignalState("error");
     });
 
     return () => {
+      stopPing();
       try {
         socket.close();
       } catch {
@@ -113,5 +153,5 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
     };
   }, [apiBaseUrl, slug, sessionId]);
 
-  return { signalState, latestRoomSummary };
+  return { signalState, latestRoomSummary, sessionExpired };
 }

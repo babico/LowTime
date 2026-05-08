@@ -42,11 +42,14 @@ export function registerMediaRoutes(app: FastifyInstance, context: RouteContext)
       const session = room.sessions.find((entry) => entry.id === validation.value.sessionId);
 
       if (session == null) {
-        reply.code(404);
+        reply.code(410);
         return {
-          message: "Session not found",
+          message: "Session expired; rejoin the room",
         };
       }
+
+      // Bump lastSeenAt so the session stays fresh while the client is active.
+      context.roomStore.touchSession(room.slug, session.id, context.now());
 
       if (validation.value.transportPreference !== "sfu") {
         reply.code(400);

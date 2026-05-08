@@ -105,7 +105,7 @@ export function registerLobbyRoutes(app: FastifyInstance, context: RouteContext)
         return { message: "Room is no longer available" };
       }
 
-      const lobbyRequest = context.roomStore.approveLobbyRequest(room.slug, request.params.requestId);
+      const lobbyRequest = context.roomStore.approveLobbyRequest(room.slug, request.params.requestId, context.now());
 
       if (lobbyRequest == null || lobbyRequest.sessionId == null || lobbyRequest.transportPreference == null) {
         reply.code(404);

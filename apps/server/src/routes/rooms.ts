@@ -165,7 +165,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
         };
       }
 
-      const session = context.roomStore.createSession(room.slug, validation.value.displayName);
+      const session = context.roomStore.createSession(room.slug, validation.value.displayName, context.now());
 
       if (session == null) {
         return {
