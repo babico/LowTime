@@ -159,6 +159,7 @@ export function useCallFlow(input: UseCallFlowInput) {
           credentials,
           requestedMedia: activeCallSession.requestedMedia,
           qualityPreset: activeCallSession.qualityPreset,
+          advancedPrefs: activeCallSession.advancedPrefs,
         });
 
         if (cancelled) {

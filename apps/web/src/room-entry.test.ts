@@ -83,6 +83,7 @@ test("stored call sessions round-trip and clear cleanly", () => {
       audio: true,
       video: true,
     },
+    advancedPrefs: undefined,
   });
 
   clearStoredCallSession(mockStorage, "Room123");
@@ -153,4 +154,78 @@ test("clearStoredHostSecret removes the host secret and is a no-op for missing k
   // No-op for a slug that has no cached secret.
   clearStoredHostSecret(mockStorage, "RoomDoesNotExist");
   assert.equal(loadStoredHostSecret(mockStorage, "RoomDoesNotExist"), null);
+});
+
+
+test("stored call sessions round-trip advancedPrefs", () => {
+  const storage = new Map<string, string>();
+  const mockStorage = {
+    getItem(key: string) {
+      return storage.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      storage.set(key, value);
+    },
+    removeItem(key: string) {
+      storage.delete(key);
+    },
+  } as Storage;
+
+  saveStoredCallSession(mockStorage, "Room789", {
+    sessionId: "sess_789",
+    displayName: "Avery",
+    qualityPreset: "balanced",
+    transportPreference: "sfu",
+    requestedMedia: {
+      audio: true,
+      video: true,
+    },
+    advancedPrefs: {
+      maxResolution: "360p",
+      maxFps: 12,
+      maxBitrateKbps: 300,
+      audioPriority: true,
+      audioOnly: false,
+      receiveVideo: true,
+    },
+  });
+
+  const loaded = loadStoredCallSession(mockStorage, "Room789");
+  assert.deepEqual(loaded?.advancedPrefs, {
+    maxResolution: "360p",
+    maxFps: 12,
+    maxBitrateKbps: 300,
+    audioPriority: true,
+    audioOnly: false,
+    receiveVideo: true,
+  });
+});
+
+test("stored call sessions without advancedPrefs load with advancedPrefs undefined", () => {
+  const storage = new Map<string, string>();
+  const mockStorage = {
+    getItem(key: string) {
+      return storage.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      storage.set(key, value);
+    },
+    removeItem(key: string) {
+      storage.delete(key);
+    },
+  } as Storage;
+
+  saveStoredCallSession(mockStorage, "RoomLegacy", {
+    sessionId: "sess_legacy",
+    displayName: "Legacy",
+    qualityPreset: "balanced",
+    transportPreference: "sfu",
+    requestedMedia: {
+      audio: true,
+      video: true,
+    },
+  });
+
+  const loaded = loadStoredCallSession(mockStorage, "RoomLegacy");
+  assert.equal(loaded?.advancedPrefs, undefined);
 });

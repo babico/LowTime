@@ -1,31 +1,41 @@
 import { Room, VideoPresets, type VideoEncoding, type VideoResolution } from "livekit-client";
 
-import type { QualityPreset, RequestedMedia, SfuTokenResponse } from "@lowtime/shared";
+import type {
+  AdvancedMediaPrefs,
+  QualityCap,
+  QualityPreset,
+  RequestedMedia,
+  SfuTokenResponse,
+} from "@lowtime/shared";
 
-import { getPresetProfile } from "./quality-presets.js";
+import {
+  computeEffectivePublishOptions,
+  type EffectivePublishOptions,
+} from "./quality-presets.js";
 
 export interface ConnectToSfuInput {
   credentials: SfuTokenResponse;
   requestedMedia: RequestedMedia;
   qualityPreset?: QualityPreset;
+  qualityCap?: QualityCap;
+  advancedPrefs?: AdvancedMediaPrefs;
 }
 
 /**
- * Turns a quality preset into the LiveKit publish options the Room should use
- * for the local video track. Callers without a preset get Balanced, matching
- * the pre-existing behavior.
+ * Turns the preset / cap / advanced-prefs triple into the LiveKit publish
+ * options the Room uses for its local video track. Callers without any of
+ * the optional fields get the legacy Balanced defaults.
  */
-function buildLiveKitOptions(qualityPreset: QualityPreset | undefined): {
+function buildLiveKitOptions(
+  effective: EffectivePublishOptions,
+): {
   videoCaptureDefaults: { resolution: VideoResolution };
-  publishDefaults: { videoEncoding: VideoEncoding };
+  publishDefaults: { videoEncoding: VideoEncoding; dtx: boolean };
 } {
-  const profile = getPresetProfile(qualityPreset ?? "balanced");
   const resolution: VideoResolution = {
-    width: profile.maxResolution.width,
-    height: profile.maxResolution.height,
-    frameRate: profile.maxFps,
-    // Reference an existing preset to let LiveKit pick a reasonable
-    // base encoding while our bitrate cap applies on top.
+    width: effective.resolution.width,
+    height: effective.resolution.height,
+    frameRate: effective.resolution.frameRate,
     ...VideoPresets.h360.encoding,
   };
 
@@ -33,15 +43,24 @@ function buildLiveKitOptions(qualityPreset: QualityPreset | undefined): {
     videoCaptureDefaults: { resolution },
     publishDefaults: {
       videoEncoding: {
-        maxBitrate: profile.maxVideoBitrateKbps * 1000,
-        maxFramerate: profile.maxFps,
+        maxBitrate: effective.maxBitrateKbps * 1000,
+        maxFramerate: effective.resolution.frameRate,
       },
+      // `dtx = true` lets WebRTC stop sending audio during silence, which
+      // keeps more bandwidth available for video. Flipped on when the user
+      // opts into audio priority.
+      dtx: effective.audioPriority,
     },
   };
 }
 
 export async function connectToSfu(input: ConnectToSfuInput): Promise<Room> {
-  const liveKitOptions = buildLiveKitOptions(input.qualityPreset);
+  const effective = computeEffectivePublishOptions({
+    preset: input.qualityPreset ?? "balanced",
+    cap: input.qualityCap ?? "high",
+    advanced: input.advancedPrefs,
+  });
+  const liveKitOptions = buildLiveKitOptions(effective);
 
   const room = new Room({
     adaptiveStream: true,
@@ -50,15 +69,20 @@ export async function connectToSfu(input: ConnectToSfuInput): Promise<Room> {
   });
 
   try {
+    // When the user asked to receive no remote video, we still connect with
+    // `autoSubscribe: true` but filter out video tracks via the room option
+    // below. Pure audio-only rooms keep the default.
     await room.connect(input.credentials.sfuUrl, input.credentials.token, {
-      autoSubscribe: true,
+      autoSubscribe: effective.receiveVideo,
     });
 
     if (input.requestedMedia.audio) {
       await room.localParticipant.setMicrophoneEnabled(true);
     }
 
-    if (input.requestedMedia.video) {
+    // Honor audioOnly: do NOT publish camera even when requestedMedia.video
+    // is true. The user can still flip camera on later via the call UI.
+    if (input.requestedMedia.video && !effective.audioOnly) {
       await room.localParticipant.setCameraEnabled(true);
     }
 

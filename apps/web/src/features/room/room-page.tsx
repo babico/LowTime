@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 
-import type { JoinRoomResponse, LobbyRequestSummary, QualityCap, QualityPreset, RoomSummary } from "@lowtime/shared";
+import type {
+  AdvancedMediaPrefs,
+  JoinRoomResponse,
+  LobbyRequestSummary,
+  QualityCap,
+  QualityPreset,
+  ResolutionCap,
+  RoomSummary,
+} from "@lowtime/shared";
 import { clampPresetToCap } from "@lowtime/shared";
 
 import type { PreviewState } from "../../device-preview.js";
@@ -22,6 +30,7 @@ import {
 } from "../page-styles.js";
 
 interface RoomPageProps {
+  advancedPrefs: AdvancedMediaPrefs;
   displayName: string;
   hostLobbyError: string | null;
   hostLobbyRequests: LobbyRequestSummary[];
@@ -43,6 +52,7 @@ interface RoomPageProps {
   roomSummary: RoomSummary | null;
   selectedQualityPreset: QualityPreset;
   slug: string;
+  onAdvancedPrefsChange: (updater: (current: AdvancedMediaPrefs) => AdvancedMediaPrefs) => void;
   onDisplayNameChange: (value: string) => void;
   onHostLobbyAction: (requestId: string, action: "approve" | "deny") => Promise<void>;
   onJoinRoom: () => Promise<void>;
@@ -221,6 +231,10 @@ export function RoomPage(props: RoomPageProps) {
                 />
               </label>
             ) : null}
+            <AdvancedMediaControls
+              advancedPrefs={props.advancedPrefs}
+              onChange={props.onAdvancedPrefsChange}
+            />
             <div>
               <button type="button" onClick={() => void props.onJoinRoom()} disabled={joinButtonDisabled}>
                 {props.isJoining ? "Joining..." : "Join Room"}
@@ -349,6 +363,142 @@ function ManualReclaimForm(props: {
         </div>
         {props.manualError ? <p role="alert">{props.manualError}</p> : null}
       </form>
+    </section>
+  );
+}
+
+
+const RESOLUTION_CAPS: ResolutionCap[] = ["240p", "360p", "480p", "720p"];
+
+function AdvancedMediaControls(props: {
+  advancedPrefs: AdvancedMediaPrefs;
+  onChange: (updater: (current: AdvancedMediaPrefs) => AdvancedMediaPrefs) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  function updateField<K extends keyof AdvancedMediaPrefs>(
+    key: K,
+    value: AdvancedMediaPrefs[K] | undefined,
+  ) {
+    props.onChange((current) => {
+      const next = { ...current };
+      if (value === undefined) {
+        delete next[key];
+      } else {
+        next[key] = value;
+      }
+      return next;
+    });
+  }
+
+  return (
+    <section style={previewCardStyle}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-controls="advanced-media-controls-panel"
+      >
+        {isOpen ? "Hide Advanced Media Controls" : "Show Advanced Media Controls"}
+      </button>
+      {isOpen ? (
+        <div id="advanced-media-controls-panel" style={previewOptionsStyle}>
+          <label style={toggleOptionStyle}>
+            Max send resolution
+            <select
+              value={props.advancedPrefs.maxResolution ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                updateField(
+                  "maxResolution",
+                  value === "" ? undefined : (value as ResolutionCap),
+                );
+              }}
+            >
+              <option value="">Use preset default</option>
+              {RESOLUTION_CAPS.map((cap) => (
+                <option key={cap} value={cap}>
+                  {cap}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={toggleOptionStyle}>
+            Max FPS
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={props.advancedPrefs.maxFps ?? ""}
+              placeholder="Preset default"
+              onChange={(event) => {
+                const raw = event.target.value;
+                if (raw === "") {
+                  updateField("maxFps", undefined);
+                  return;
+                }
+                const parsed = Number.parseInt(raw, 10);
+                if (Number.isFinite(parsed) && parsed > 0) {
+                  updateField("maxFps", parsed);
+                }
+              }}
+            />
+          </label>
+          <label style={toggleOptionStyle}>
+            Max video bitrate (kbps)
+            <input
+              type="number"
+              min={50}
+              step={50}
+              value={props.advancedPrefs.maxBitrateKbps ?? ""}
+              placeholder="Preset default"
+              onChange={(event) => {
+                const raw = event.target.value;
+                if (raw === "") {
+                  updateField("maxBitrateKbps", undefined);
+                  return;
+                }
+                const parsed = Number.parseInt(raw, 10);
+                if (Number.isFinite(parsed) && parsed > 0) {
+                  updateField("maxBitrateKbps", parsed);
+                }
+              }}
+            />
+          </label>
+          <label style={toggleOptionStyle}>
+            <input
+              type="checkbox"
+              checked={props.advancedPrefs.audioPriority === true}
+              onChange={(event) =>
+                updateField("audioPriority", event.target.checked || undefined)
+              }
+            />
+            Prioritize audio on weak links
+          </label>
+          <label style={toggleOptionStyle}>
+            <input
+              type="checkbox"
+              checked={props.advancedPrefs.audioOnly === true}
+              onChange={(event) =>
+                updateField("audioOnly", event.target.checked || undefined)
+              }
+            />
+            Join audio-only (no outbound video)
+          </label>
+          <label style={toggleOptionStyle}>
+            <input
+              type="checkbox"
+              checked={props.advancedPrefs.receiveVideo === false}
+              onChange={(event) =>
+                // `receiveVideo` defaults to true; only store the override
+                // when the user explicitly pauses incoming video.
+                updateField("receiveVideo", event.target.checked ? false : undefined)
+              }
+            />
+            Pause incoming video
+          </label>
+        </div>
+      ) : null}
     </section>
   );
 }
