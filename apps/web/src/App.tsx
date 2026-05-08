@@ -21,6 +21,8 @@ import {
 } from "./app/routes.js";
 import { useCallFlow } from "./features/call/call-effects.js";
 import { useInstallPrompt } from "./features/home/install-effects.js";
+import { useAutoDowngrade } from "./auto-downgrade.js";
+import { computeEffectivePublishOptions } from "./quality-presets.js";
 import { joinRoomRequest, submitLobbyAction } from "./features/room/room-actions.js";
 import { useDevicePreview } from "./features/room/preview-effects.js";
 import { useRoomPageData, useHostReclaim } from "./features/room/room-effects.js";
@@ -138,6 +140,7 @@ export function App() {
   const {
     callError,
     callParticipants,
+    callRoom,
     callSession,
     callStatus,
     connectedSfuUrl,
@@ -157,6 +160,22 @@ export function App() {
     apiBaseUrl,
     setViewState,
     viewState,
+  });
+
+  const basePublishOptions = useMemo(() => {
+    if (callSession == null) return null;
+    return computeEffectivePublishOptions({
+      preset: callSession.qualityPreset,
+      cap: roomSummary?.qualityCap ?? "high",
+      advanced: callSession.advancedPrefs,
+    });
+  }, [callSession, roomSummary?.qualityCap]);
+
+  const { rung: downgradeRung, restore: restoreQuality } = useAutoDowngrade({
+    callStatus,
+    networkHealth,
+    room: callRoom,
+    basePublishOptions,
   });
   const {
     handleInstallApp,
@@ -391,6 +410,7 @@ export function App() {
         callSession,
         callStatus,
         connectedSfuUrl,
+        downgradeRung,
         hasLocalVideo: localVideoTrack != null,
         hasRemoteVideo: remoteVideoTrack != null,
         isCameraEnabled,
@@ -400,6 +420,7 @@ export function App() {
         localVideoRef,
         networkHealth,
         onLeaveCall: handleLeaveCall,
+        onRestoreQuality: restoreQuality,
         onToggleCamera: handleToggleCamera,
         onToggleMicrophone: handleToggleMicrophone,
         remoteParticipantLabel,

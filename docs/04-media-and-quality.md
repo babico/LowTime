@@ -76,6 +76,8 @@ G --> H[Pause outgoing video]
 H --> I[Prompt audio-only]
 ```
 
+The adaptation engine lives in [`apps/web/src/auto-downgrade.ts`](../apps/web/src/auto-downgrade.ts). A pure `computeDowngradeStep(state)` walks the four-rung ladder with a 10 second minimum dwell between transitions, and `useAutoDowngrade` applies the chosen rung to the active LiveKit room. The user can restore the base publish options any time via the "Restore video" chip on the call page.
+
 ## Media Degradation State Machine
 ```mermaid
 stateDiagram-v2

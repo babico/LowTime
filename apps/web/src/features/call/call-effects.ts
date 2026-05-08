@@ -44,6 +44,7 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
+  const [callRoom, setCallRoom] = useState<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -63,6 +64,7 @@ export function useCallFlow(input: UseCallFlowInput) {
       setRemoteParticipantLabel("Waiting for someone to join");
       callRoomRef.current?.disconnect();
       callRoomRef.current = null;
+      setCallRoom(null);
       return;
     }
 
@@ -208,6 +210,7 @@ export function useCallFlow(input: UseCallFlowInput) {
 
         callRoomRef.current?.disconnect();
         callRoomRef.current = room;
+        setCallRoom(room);
         setConnectedSfuUrl(credentials.sfuUrl);
         syncCallPresentation();
         setCallStatus("connected");
@@ -226,6 +229,7 @@ export function useCallFlow(input: UseCallFlowInput) {
       removeRoomListeners();
       callRoomRef.current?.disconnect();
       callRoomRef.current = null;
+      setCallRoom(null);
     };
   }, [input.apiBaseUrl, callSession, input.viewState]);
 
@@ -236,6 +240,7 @@ export function useCallFlow(input: UseCallFlowInput) {
 
     callRoomRef.current?.disconnect();
     callRoomRef.current = null;
+    setCallRoom(null);
     clearStoredCallSession(window.sessionStorage, input.viewState.slug);
     window.history.pushState({}, "", `/r/${input.viewState.slug}`);
     input.setViewState(getViewState(window.location.pathname));
@@ -286,6 +291,7 @@ export function useCallFlow(input: UseCallFlowInput) {
   return {
     callError,
     callParticipants,
+    callRoom,
     callSession,
     callStatus,
     connectedSfuUrl,
