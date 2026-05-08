@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   AccessMode,
@@ -140,6 +140,12 @@ export function App() {
     requestId: waitingRequestId,
     slug: waitingSlug,
   });
+
+  // sendSignalMessage ref: populated after useRoomSignaling is called below.
+  // Passed to useCallFlow so P2P fallback can send messages without a
+  // circular hook dependency.
+  const sendSignalMessageRef = useRef<(message: Record<string, unknown>) => void>(() => {});
+
   const {
     callError,
     callParticipants,
@@ -148,6 +154,7 @@ export function App() {
     callStatus,
     connectedSfuUrl,
     handleLeaveCall,
+    handleP2PMessage,
     handleToggleCamera,
     handleToggleMicrophone,
     isCameraEnabled,
@@ -156,6 +163,8 @@ export function App() {
     isTogglingMic,
     localVideoRef,
     localVideoTrack,
+    p2pError,
+    p2pStatus,
     remoteParticipantLabel,
     remoteVideoRef,
     remoteVideoTrack,
@@ -163,15 +172,21 @@ export function App() {
     apiBaseUrl,
     setViewState,
     viewState,
+    sendSignalMessage: (msg) => sendSignalMessageRef.current(msg),
+    maxParticipants: roomSummary?.maxParticipants,
   });
 
   // Live room signaling: subscribe while we have a concrete sessionId so
   // `room.settings_updated` events propagate to the page in real time.
-  const { latestRoomSummary } = useRoomSignaling({
+  const { latestRoomSummary, sendSignalMessage } = useRoomSignaling({
     apiBaseUrl,
     slug: viewState.kind === "call" ? viewState.slug : null,
     sessionId: callSession?.sessionId ?? null,
+    onP2PMessage: handleP2PMessage,
   });
+
+  // Keep the ref in sync so useCallFlow's sendSignalMessage wrapper is always current.
+  sendSignalMessageRef.current = sendSignalMessage;
 
   // Prefer the live summary from the signaling hook when the room page is
   // visible; fall back to the REST-fetched summary otherwise. This keeps the
@@ -466,6 +481,8 @@ export function App() {
         onRestoreQuality: restoreQuality,
         onToggleCamera: handleToggleCamera,
         onToggleMicrophone: handleToggleMicrophone,
+        p2pError,
+        p2pStatus,
         remoteParticipantLabel,
         remoteVideoRef,
         slug: viewState.kind === "call" ? viewState.slug : "",

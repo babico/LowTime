@@ -14,15 +14,20 @@ import type { SignalServerEvent } from "../domain/signal-bus.js";
  *     success, or with an `error` frame and closes on failure.
  *   - While connected, the socket receives every event the `SignalBus`
  *     publishes for that slug until the socket closes.
- *
- * Out of scope for this PR: chat, p2p negotiation, reconnect, media state,
- * quality update echoes. The handler ignores any subsequent client
- * message with a clear `error` frame so future extensions stay additive.
+ *   - After connect, the client may send `room.ping` to keep the session
+ *     alive; the server replies with `room.pong`.
+ *   - For 1:1 rooms, the client may send `p2p.offer`, `p2p.answer`, and
+ *     `p2p.ice` messages; the server relays them to the other session.
  */
 export function registerSignalRoutes(
   app: FastifyInstance,
   context: RouteContext,
 ): void {
+  // Socket registry: slug → (sessionId → safeSend). Used for P2P relay.
+  // This is closure-local and intentionally not shared with SignalBus.
+  type SafeSendFn = (event: SignalServerEvent | Record<string, unknown>) => void;
+  const socketRegistry = new Map<string, Map<string, SafeSendFn>>();
+
   void app.register(async (instance) => {
     const { default: websocketPlugin } = await import("@fastify/websocket");
     await instance.register(websocketPlugin);
@@ -38,7 +43,7 @@ export function registerSignalRoutes(
       let connectedSlug = "";
       let connectedSessionId = "";
 
-      const safeSend = (event: SignalServerEvent) => {
+      const safeSend = (event: SignalServerEvent | Record<string, unknown>) => {
         try {
           socket.send(JSON.stringify(event));
         } catch (error) {
@@ -103,6 +108,7 @@ export function registerSignalRoutes(
           connectReceived = true;
           connectedSlug = roomSlug;
           connectedSessionId = sessionId;
+
           safeSend({
             kind: "room.snapshot",
             room: toRoomSummary(room, context.now()),
@@ -111,6 +117,23 @@ export function registerSignalRoutes(
           unsubscribe = context.signalBus.subscribe(roomSlug, (event) => {
             safeSend(event);
           });
+
+          // Register in the socket registry for P2P relay.
+          let peers = socketRegistry.get(roomSlug);
+          if (peers == null) {
+            peers = new Map();
+            socketRegistry.set(roomSlug, peers);
+          }
+          peers.set(sessionId, safeSend);
+
+          // Emit transport.switch_available to both sessions when the second
+          // session connects to a 1:1 room.
+          if (room.maxParticipants === 2 && peers.size === 2) {
+            for (const peerSend of peers.values()) {
+              peerSend({ kind: "transport.switch_available", nextTransport: "p2p" });
+            }
+          }
+
           return;
         }
 
@@ -136,6 +159,35 @@ export function registerSignalRoutes(
           return;
         }
 
+        // Handle P2P signaling relay.
+        if (payload.kind === "p2p.offer" || payload.kind === "p2p.answer" || payload.kind === "p2p.ice") {
+          const room = context.roomStore.getRoom(connectedSlug);
+          if (room == null || room.maxParticipants !== 2) {
+            safeSend({
+              kind: "error",
+              code: "p2p_not_available",
+              message: "P2P signaling is not available for this room",
+            });
+            return;
+          }
+          const peers = socketRegistry.get(connectedSlug);
+          if (peers == null || peers.size !== 2) {
+            safeSend({
+              kind: "error",
+              code: "p2p_not_ready",
+              message: "P2P signaling requires exactly two connected participants",
+            });
+            return;
+          }
+          // Relay to the other session only (no echo).
+          for (const [peerId, peerSend] of peers) {
+            if (peerId !== connectedSessionId) {
+              peerSend({ kind: payload.kind, payload: payload.payload });
+            }
+          }
+          return;
+        }
+
         // Any other subsequent message is currently unsupported. Send a soft error
         // frame but keep the socket open so clients can continue to receive
         // server-pushed events.
@@ -149,6 +201,16 @@ export function registerSignalRoutes(
       const cleanup = () => {
         unsubscribe?.();
         unsubscribe = null;
+        // Remove from socket registry.
+        if (connectedSlug !== "" && connectedSessionId !== "") {
+          const peers = socketRegistry.get(connectedSlug);
+          if (peers != null) {
+            peers.delete(connectedSessionId);
+            if (peers.size === 0) {
+              socketRegistry.delete(connectedSlug);
+            }
+          }
+        }
       };
       socket.on("close", cleanup);
       socket.on("error", () => {

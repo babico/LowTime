@@ -17,6 +17,8 @@ import {
   type StoredCallSession,
   type ViewState,
 } from "../../room-entry.js";
+import type { P2PCallStatus } from "./use-p2p-fallback.js";
+import { useP2PFallback } from "./use-p2p-fallback.js";
 
 const DEFAULT_REQUESTED_MEDIA = {
   audio: true,
@@ -27,6 +29,10 @@ interface UseCallFlowInput {
   apiBaseUrl: string;
   setViewState: (viewState: ViewState) => void;
   viewState: ViewState;
+  /** Injected from useRoomSignaling to send P2P signal messages. */
+  sendSignalMessage?: (message: Record<string, unknown>) => void;
+  /** Room's maxParticipants — used to decide whether P2P fallback is available. */
+  maxParticipants?: number;
 }
 
 export function useCallFlow(input: UseCallFlowInput) {
@@ -42,11 +48,24 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [localVideoTrack, setLocalVideoTrack] = useState<VideoTrackLike | null>(null);
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<VideoTrackLike | null>(null);
   const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const [callRoom, setCallRoom] = useState<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const slug = input.viewState.kind === "call" ? input.viewState.slug : "";
+  const sessionId = callSession?.sessionId ?? "";
+
+  const p2pFallback = useP2PFallback({
+    apiBaseUrl: input.apiBaseUrl,
+    slug,
+    sessionId,
+    sendSignalMessage: input.sendSignalMessage ?? (() => {}),
+    localStream,
+    remoteVideoRef,
+  });
 
   useEffect(() => {
     if (input.viewState.kind !== "call") {
@@ -62,6 +81,7 @@ export function useCallFlow(input: UseCallFlowInput) {
       setLocalVideoTrack(null);
       setRemoteVideoTrack(null);
       setRemoteParticipantLabel("Waiting for someone to join");
+      setLocalStream(null);
       callRoomRef.current?.disconnect();
       callRoomRef.current = null;
       setCallRoom(null);
@@ -142,12 +162,29 @@ export function useCallFlow(input: UseCallFlowInput) {
 
         if (!tokenResponse.ok) {
           const payload = (await tokenResponse.json()) as { message?: string };
-          throw new Error(payload.message ?? "Unable to request media token");
+          const errorMessage = payload.message ?? "Unable to request media token";
+
+          // If SFU is not configured and this is a 1:1 room, try P2P fallback.
+          if (tokenResponse.status === 503 && (input.maxParticipants ?? 0) === 2) {
+            if (!cancelled) {
+              p2pFallback.initiateFallback();
+            }
+            return;
+          }
+
+          throw new Error(errorMessage);
         }
 
         const credentials = (await tokenResponse.json()) as MediaTokenResponse;
 
         if (credentials.transport !== "sfu") {
+          // Non-SFU token received — try P2P if 1:1 room.
+          if (credentials.transport === "p2p" && (input.maxParticipants ?? 0) === 2) {
+            if (!cancelled) {
+              p2pFallback.initiateFallback();
+            }
+            return;
+          }
           throw new Error("Only SFU transport is currently supported in the web client");
         }
 
@@ -157,16 +194,40 @@ export function useCallFlow(input: UseCallFlowInput) {
 
         setCallStatus("connecting");
 
-        const room = await connectToSfu({
-          credentials,
-          requestedMedia: activeCallSession.requestedMedia,
-          qualityPreset: activeCallSession.qualityPreset,
-          advancedPrefs: activeCallSession.advancedPrefs,
-        });
+        let room: Awaited<ReturnType<typeof connectToSfu>>;
+        try {
+          room = await connectToSfu({
+            credentials,
+            requestedMedia: activeCallSession.requestedMedia,
+            qualityPreset: activeCallSession.qualityPreset,
+            advancedPrefs: activeCallSession.advancedPrefs,
+          });
+        } catch (sfuError) {
+          // SFU connection failed — try P2P fallback for 1:1 rooms.
+          if ((input.maxParticipants ?? 0) === 2 && !cancelled) {
+            p2pFallback.initiateFallback();
+            return;
+          }
+          throw sfuError;
+        }
 
         if (cancelled) {
           room.disconnect();
           return;
+        }
+
+        // Capture local stream for potential P2P fallback.
+        try {
+          const localTracks = room.localParticipant.videoTrackPublications;
+          if (localTracks.size > 0) {
+            const firstPub = localTracks.values().next().value;
+            if (firstPub?.track?.mediaStreamTrack != null) {
+              const stream = new MediaStream([firstPub.track.mediaStreamTrack]);
+              setLocalStream(stream);
+            }
+          }
+        } catch {
+          // Non-critical; P2P fallback will work without pre-captured stream.
         }
 
         const syncCallPresentation = () => {
@@ -238,6 +299,7 @@ export function useCallFlow(input: UseCallFlowInput) {
       return;
     }
 
+    p2pFallback.cleanup();
     callRoomRef.current?.disconnect();
     callRoomRef.current = null;
     setCallRoom(null);
@@ -288,6 +350,9 @@ export function useCallFlow(input: UseCallFlowInput) {
     }
   }
 
+  /** Callback to pass to useRoomSignaling's onP2PMessage. */
+  const handleP2PMessage = p2pFallback.handleP2PMessage;
+
   return {
     callError,
     callParticipants,
@@ -296,6 +361,7 @@ export function useCallFlow(input: UseCallFlowInput) {
     callStatus,
     connectedSfuUrl,
     handleLeaveCall,
+    handleP2PMessage,
     handleToggleCamera,
     handleToggleMicrophone,
     isCameraEnabled,
@@ -304,8 +370,12 @@ export function useCallFlow(input: UseCallFlowInput) {
     isTogglingMic,
     localVideoRef,
     localVideoTrack,
+    p2pError: p2pFallback.p2pError,
+    p2pStatus: p2pFallback.p2pStatus,
     remoteParticipantLabel,
     remoteVideoRef,
     remoteVideoTrack,
   };
 }
+
+export type { P2PCallStatus };

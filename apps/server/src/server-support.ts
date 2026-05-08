@@ -23,6 +23,12 @@ import {
   type RoomStore,
   type StoredRoom,
 } from "./domain/room-store.js";
+import type { IceServerConfig } from "@lowtime/shared";
+
+/** Default ICE servers used when no override is provided. */
+export const DEFAULT_ICE_SERVERS: IceServerConfig[] = [
+  { urls: ["stun:stun.l.google.com:19302"] },
+];
 
 export interface BuildAppOptions {
   now?: () => Date;
@@ -33,6 +39,11 @@ export interface BuildAppOptions {
   reclaimRateLimiter?: ReclaimRateLimiter;
   /** Injected signal bus override. Defaults to the in-memory implementation. */
   signalBus?: SignalBus;
+  /**
+   * ICE server configuration for P2P fallback. When omitted, defaults to a
+   * public Google STUN server. Inject TURN credentials here in production.
+   */
+  iceServers?: IceServerConfig[];
   /**
    * Interval in ms for the cleanup loop. When omitted, `0`, negative, or
    * non-finite, the cleanup loop does not start. Tests build Fastify without
@@ -57,6 +68,7 @@ export interface RouteContext {
   passcodeRateLimiter: PasscodeRateLimiter;
   reclaimRateLimiter: ReclaimRateLimiter;
   signalBus: SignalBus;
+  iceServers: IceServerConfig[];
 }
 
 export function createRouteContext(options: BuildAppOptions = {}): RouteContext {
@@ -68,6 +80,7 @@ export function createRouteContext(options: BuildAppOptions = {}): RouteContext 
     passcodeRateLimiter: options.passcodeRateLimiter ?? createInMemoryPasscodeRateLimiter(),
     reclaimRateLimiter: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
     signalBus: options.signalBus ?? createInMemorySignalBus(),
+    iceServers: options.iceServers ?? DEFAULT_ICE_SERVERS,
   };
 }
 
