@@ -307,3 +307,131 @@ test("POST /api/rooms continues to issue a host secret after the reclaim route i
 
   await app.close();
 });
+
+
+test("POST /api/rooms sets expiresAt to lastActivityAt + 2h on fresh creation", async () => {
+  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+  const { ROOM_TTL_MS } = await import("./domain/room-store.js");
+
+  const store = createInMemoryRoomStore();
+  const frozen = new Date("2026-03-24T12:00:00.000Z");
+  const app = buildApp({
+    now: () => frozen,
+    roomStore: store,
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+  });
+  assert.equal(response.statusCode, 200);
+
+  const { roomSlug, expiresAt } = response.json();
+  const stored = store.getRoom(roomSlug);
+  assert.ok(stored != null);
+  assert.equal(stored.lastActivityAt, frozen.toISOString());
+  assert.equal(
+    Date.parse(stored.expiresAt) - Date.parse(stored.lastActivityAt),
+    ROOM_TTL_MS,
+  );
+  assert.equal(stored.closedAt, null);
+  assert.equal(expiresAt, stored.expiresAt);
+
+  await app.close();
+});
+
+test("Direct admission bumps lastActivityAt but does not reset it backwards", async () => {
+  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+  const store = createInMemoryRoomStore();
+  let simulated = new Date("2026-03-24T12:00:00.000Z");
+  const app = buildApp({
+    now: () => simulated,
+    roomStore: store,
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+  });
+  const { roomSlug } = createResponse.json();
+  const atCreate = store.getRoom(roomSlug)?.lastActivityAt;
+
+  // Advance the clock by 30 minutes then join.
+  simulated = new Date(simulated.getTime() + 30 * 60_000);
+  const joinResponse = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: { displayName: "Sam" },
+  });
+  assert.equal(joinResponse.statusCode, 200);
+  const afterJoin = store.getRoom(roomSlug)?.lastActivityAt;
+
+  assert.ok(atCreate != null && afterJoin != null);
+  assert.equal(afterJoin, simulated.toISOString());
+  assert.ok(Date.parse(afterJoin) > Date.parse(atCreate));
+
+  await app.close();
+});
+
+test("Waiting lobby join does NOT bump lastActivityAt", async () => {
+  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+  const store = createInMemoryRoomStore();
+  let simulated = new Date("2026-03-24T12:00:00.000Z");
+  const app = buildApp({
+    now: () => simulated,
+    roomStore: store,
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+    payload: { accessMode: "lobby" },
+  });
+  const { roomSlug } = createResponse.json();
+  const beforeLobby = store.getRoom(roomSlug)?.lastActivityAt;
+
+  simulated = new Date(simulated.getTime() + 10 * 60_000);
+  const joinResponse = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: { displayName: "Sam" },
+  });
+  assert.equal(joinResponse.statusCode, 200);
+  const afterLobby = store.getRoom(roomSlug)?.lastActivityAt;
+  // A lobby-waiting join must not bump the activity clock.
+  assert.equal(afterLobby, beforeLobby);
+
+  await app.close();
+});
+
+test("GET /api/rooms/:slug does NOT bump lastActivityAt", async () => {
+  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+  const store = createInMemoryRoomStore();
+  let simulated = new Date("2026-03-24T12:00:00.000Z");
+  const app = buildApp({
+    now: () => simulated,
+    roomStore: store,
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+  });
+  const { roomSlug } = createResponse.json();
+  const beforeGet = store.getRoom(roomSlug)?.lastActivityAt;
+
+  simulated = new Date(simulated.getTime() + 90 * 60_000);
+  const getResponse = await app.inject({
+    method: "GET",
+    url: `/api/rooms/${roomSlug}`,
+  });
+  assert.equal(getResponse.statusCode, 200);
+
+  const afterGet = store.getRoom(roomSlug)?.lastActivityAt;
+  assert.equal(afterGet, beforeGet);
+
+  await app.close();
+});

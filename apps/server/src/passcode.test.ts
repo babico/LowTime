@@ -1518,3 +1518,118 @@ describe("HTTP: Property 7 (rotation safety)", () => {
     );
   });
 });
+
+
+describe("Activity bumps from settings mutations", () => {
+  test("successful passcode rotation bumps lastActivityAt", async () => {
+    const store = createInMemoryRoomStore();
+    const verifier = createFakeVerifier();
+    let simulated = new Date("2026-03-24T12:00:00.000Z");
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      passcodeVerifier: verifier,
+      roomStore: store,
+      now: () => simulated,
+    });
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+      payload: { accessMode: "passcode", passcode: "original-passcode" },
+    });
+    const { roomSlug, hostSecret } = createResponse.json() as {
+      roomSlug: string;
+      hostSecret: string;
+    };
+    const beforeRotate = store.getRoom(roomSlug)?.lastActivityAt;
+
+    simulated = new Date(simulated.getTime() + 30 * 60_000);
+    const rotateResponse = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/settings`,
+      headers: { "x-host-secret": hostSecret },
+      payload: { passcode: "new-rotated-passcode" },
+    });
+    assert.equal(rotateResponse.statusCode, 200);
+
+    const afterRotate = store.getRoom(roomSlug)?.lastActivityAt;
+    assert.equal(afterRotate, simulated.toISOString());
+    assert.ok(
+      beforeRotate != null &&
+        afterRotate != null &&
+        Date.parse(afterRotate) > Date.parse(beforeRotate),
+    );
+
+    await app.close();
+  });
+
+  test("settings call with wrong host secret does NOT bump lastActivityAt", async () => {
+    const store = createInMemoryRoomStore();
+    const verifier = createFakeVerifier();
+    let simulated = new Date("2026-03-24T12:00:00.000Z");
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      passcodeVerifier: verifier,
+      roomStore: store,
+      now: () => simulated,
+    });
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+      payload: { accessMode: "passcode", passcode: "original-passcode" },
+    });
+    const { roomSlug } = createResponse.json() as { roomSlug: string };
+    const beforeAttempt = store.getRoom(roomSlug)?.lastActivityAt;
+
+    simulated = new Date(simulated.getTime() + 30 * 60_000);
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/settings`,
+      headers: { "x-host-secret": "wrong-host-secret" },
+      payload: { accessMode: "open" },
+    });
+    assert.equal(response.statusCode, 403);
+
+    const afterAttempt = store.getRoom(roomSlug)?.lastActivityAt;
+    assert.equal(afterAttempt, beforeAttempt);
+
+    await app.close();
+  });
+
+  test("wrong-passcode join does NOT bump lastActivityAt", async () => {
+    const store = createInMemoryRoomStore();
+    const verifier = createFakeVerifier();
+    let simulated = new Date("2026-03-24T12:00:00.000Z");
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      passcodeVerifier: verifier,
+      roomStore: store,
+      now: () => simulated,
+    });
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+      payload: { accessMode: "passcode", passcode: "correct-passcode" },
+    });
+    const { roomSlug } = createResponse.json() as { roomSlug: string };
+    const beforeAttempt = store.getRoom(roomSlug)?.lastActivityAt;
+
+    simulated = new Date(simulated.getTime() + 30 * 60_000);
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/join`,
+      payload: { displayName: "Sam", passcode: "wrong-passcode" },
+    });
+    assert.equal(response.statusCode, 200);
+
+    const afterAttempt = store.getRoom(roomSlug)?.lastActivityAt;
+    assert.equal(afterAttempt, beforeAttempt);
+
+    await app.close();
+  });
+});
