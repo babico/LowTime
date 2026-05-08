@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   AccessMode,
+  AdvancedMediaPrefs,
   CreateRoomRequest,
   CreateRoomResponse,
   JoinRoomResponse,
@@ -46,6 +47,7 @@ export function App() {
 
   const [displayName, setDisplayName] = useState("");
   const [selectedQualityPreset, setSelectedQualityPreset] = useState<QualityPreset>(DEFAULT_QUALITY_PRESET);
+  const [advancedPrefs, setAdvancedPrefs] = useState<AdvancedMediaPrefs>({});
   const [joinPasscodeInput, setJoinPasscodeInput] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
@@ -227,6 +229,7 @@ export function App() {
     setDisplayName("");
     setSelectedQualityPreset(DEFAULT_QUALITY_PRESET);
     setJoinPasscodeInput("");
+    setAdvancedPrefs({});
   }, [viewState]);
 
   // When the user navigates away from the home page, drop the in-memory
@@ -329,6 +332,7 @@ export function App() {
           qualityPreset: selectedQualityPreset,
           transportPreference: payload.transportPreference,
           requestedMedia: previewRequestedMedia,
+          advancedPrefs,
         });
 
         clearPreview();
@@ -443,6 +447,7 @@ export function App() {
         pushRoute(window.history, window.location, getRoomRoute(viewState.slug), setViewState);
       }}
       roomPageProps={{
+        advancedPrefs,
         displayName,
         hostLobbyError,
         hostLobbyRequests,
@@ -451,6 +456,7 @@ export function App() {
         isLoadingRoom,
         joinError,
         joinResult,
+        onAdvancedPrefsChange: setAdvancedPrefs,
         onDisplayNameChange: setDisplayName,
         onHostLobbyAction: handleHostLobbyAction,
         onJoinRoom: handleJoinRoom,

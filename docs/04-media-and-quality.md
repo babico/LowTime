@@ -52,6 +52,7 @@ H -->|No| J[Show rejoin failure]
 - Hide self-view
 - Front and rear camera switch on mobile
 - Mic and speaker selection where browser APIs allow it
+- The web client exposes six of these overrides today through an "Advanced Media Controls" disclosure on the room page. The user-visible shape lives in [`packages/shared/src/index.ts`](../packages/shared/src/index.ts) as `AdvancedMediaPrefs`, and the pure `computeEffectivePublishOptions` helper in [`apps/web/src/quality-presets.ts`](../apps/web/src/quality-presets.ts) is the single place that combines the preset profile, the host cap, and the user overrides into the final LiveKit publish options. The host quality cap always clamps first; user overrides can only tighten, never loosen, the preset + cap baseline.
 
 ## Host Quality Policy
 - Host quality cap values are `Low`, `Balanced`, and `High`.

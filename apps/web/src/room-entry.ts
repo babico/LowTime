@@ -1,4 +1,9 @@
-import type { QualityPreset, RequestedMedia, TransportPreference } from "@lowtime/shared";
+import type {
+  AdvancedMediaPrefs,
+  QualityPreset,
+  RequestedMedia,
+  TransportPreference,
+} from "@lowtime/shared";
 
 export type ViewState =
   | { kind: "home" }
@@ -12,6 +17,7 @@ export interface StoredCallSession {
   qualityPreset: QualityPreset;
   requestedMedia: RequestedMedia;
   transportPreference: TransportPreference;
+  advancedPrefs?: AdvancedMediaPrefs;
 }
 
 export interface StoredLobbyRequest {
@@ -112,10 +118,17 @@ export function loadStoredCallSession(storage: Storage, slug: string): StoredCal
         audio: parsed.requestedMedia.audio,
         video: parsed.requestedMedia.video,
       },
+      advancedPrefs: isRecord(parsed.advancedPrefs)
+        ? (parsed.advancedPrefs as AdvancedMediaPrefs)
+        : undefined,
     };
   } catch {
     return null;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function clearStoredCallSession(storage: Storage, slug: string) {

@@ -53,6 +53,36 @@ export interface UpdateRoomSettingsRequest {
   qualityCap?: QualityCap;
 }
 
+export type ResolutionCap = "240p" | "360p" | "480p" | "720p";
+
+export interface AdvancedMediaPrefs {
+  maxResolution?: ResolutionCap;
+  maxFps?: number;
+  maxBitrateKbps?: number;
+  audioPriority?: boolean;
+  receiveVideo?: boolean;
+  audioOnly?: boolean;
+}
+
+/**
+ * Maps a `ResolutionCap` to its pixel dimensions. Total and idempotent.
+ */
+export function resolutionCapToPixels(cap: ResolutionCap): {
+  width: number;
+  height: number;
+} {
+  switch (cap) {
+    case "240p":
+      return { width: 320, height: 240 };
+    case "360p":
+      return { width: 640, height: 360 };
+    case "480p":
+      return { width: 854, height: 480 };
+    case "720p":
+      return { width: 1280, height: 720 };
+  }
+}
+
 export interface UpdateRoomSettingsResponse {
   room: RoomSummary;
 }
