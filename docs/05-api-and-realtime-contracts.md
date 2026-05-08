@@ -162,6 +162,14 @@ Current implementation notes:
 - Client opens the socket after join admission and before or alongside media transport setup.
 - First message must identify the `roomSlug`, `sessionId`, and optional `hostSecret`.
 
+### Currently Implemented
+- **Client → server**: `room.connect` with `{ kind: "room.connect", roomSlug, sessionId }` as the first frame. Any other first frame returns `{ kind: "error", code: "bad_connect" }` and closes the socket. Unknown slug or unknown `sessionId` returns `{ kind: "error", code: "unauthorized" }` and closes.
+- **Server → client**: on a successful connect, the server immediately sends `{ kind: "room.snapshot", room: RoomSummary }`. While connected, every accepted `POST /api/rooms/:slug/settings` call fans out `{ kind: "room.settings_updated", room: RoomSummary }` to every subscribed socket on that slug.
+- **Server → client** error shape: `{ kind: "error", code, message }`.
+
+### Deferred
+The event tables below enumerate the full planned signaling surface. Everything except `room.connect`, `room.snapshot`, `room.settings_updated`, and the `error` frame is still planned.
+
 ### Client To Server Events
 
 | Event | Payload | Purpose |

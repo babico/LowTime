@@ -8,6 +8,7 @@ import type {
   JoinRoomResponse,
   LobbyRequestStatusResponse,
   QualityPreset,
+  RoomSummary,
 } from "@lowtime/shared";
 
 import { AppShell } from "./app/app-shell.js";
@@ -27,6 +28,7 @@ import { computeEffectivePublishOptions } from "./quality-presets.js";
 import { joinRoomRequest, submitLobbyAction } from "./features/room/room-actions.js";
 import { useDevicePreview } from "./features/room/preview-effects.js";
 import { useRoomPageData, useHostReclaim } from "./features/room/room-effects.js";
+import { useRoomSignaling } from "./features/room/room-signaling.js";
 import { useWaitingRoomState } from "./features/waiting/waiting-effects.js";
 import { assessNetworkHealth, type NetworkHealth } from "./network-health.js";
 import {
@@ -163,14 +165,27 @@ export function App() {
     viewState,
   });
 
+  // Live room signaling: subscribe while we have a concrete sessionId so
+  // `room.settings_updated` events propagate to the page in real time.
+  const { latestRoomSummary } = useRoomSignaling({
+    apiBaseUrl,
+    slug: viewState.kind === "call" ? viewState.slug : null,
+    sessionId: callSession?.sessionId ?? null,
+  });
+
+  // Prefer the live summary from the signaling hook when the room page is
+  // visible; fall back to the REST-fetched summary otherwise. This keeps the
+  // access mode / quality cap in sync with any host-driven settings change.
+  const effectiveRoomSummary: RoomSummary | null = latestRoomSummary ?? roomSummary;
+
   const basePublishOptions = useMemo(() => {
     if (callSession == null) return null;
     return computeEffectivePublishOptions({
       preset: callSession.qualityPreset,
-      cap: roomSummary?.qualityCap ?? "high",
+      cap: effectiveRoomSummary?.qualityCap ?? "high",
       advanced: callSession.advancedPrefs,
     });
-  }, [callSession, roomSummary?.qualityCap]);
+  }, [callSession, effectiveRoomSummary?.qualityCap]);
 
   const { rung: downgradeRung, lastTransitionAt, restore: restoreQuality } = useAutoDowngrade({
     callStatus,
