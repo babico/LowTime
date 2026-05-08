@@ -579,3 +579,472 @@ describe("Property: cleanup tick is idempotent for any in-memory store snapshot"
     );
   });
 });
+
+
+describe("runCleanupTick: lobby request state preservation", () => {
+  test("already-approved lobby requests are left untouched", () => {
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const room = store.createRoom(
+      {
+        accessMode: "lobby",
+        maxParticipants: 2,
+        qualityCap: "balanced",
+        allowScreenShare: true,
+      },
+      t0,
+    );
+    const req = store.createLobbyRequest(room.slug, "Guest", t0.toISOString());
+    assert.ok(req != null);
+    // Approve so the request enters the `"approved"` state.
+    store.approveLobbyRequest(room.slug, req.id);
+
+    const tick = new Date(t0.getTime() + LOBBY_REQUEST_TTL_MS + 1);
+    const result = runCleanupTick(store, {}, tick);
+
+    assert.equal(result.lobbyRequestsTimedOut, 0);
+    const after = store.getLobbyRequest(room.slug, req.id);
+    assert.equal(after?.status, "approved");
+  });
+
+  test("a prior host_denied denial is not overwritten by a later lobby_timeout tick", () => {
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const room = store.createRoom(
+      {
+        accessMode: "lobby",
+        maxParticipants: 2,
+        qualityCap: "balanced",
+        allowScreenShare: true,
+      },
+      t0,
+    );
+    const req = store.createLobbyRequest(room.slug, "Guest", t0.toISOString());
+    assert.ok(req != null);
+    // Host denied it explicitly. The tick must not overwrite the denial reason
+    // even though the request is older than the 10-minute TTL.
+    store.denyLobbyRequest(room.slug, req.id, "host_denied");
+
+    const tick = new Date(t0.getTime() + LOBBY_REQUEST_TTL_MS + 1);
+    const result = runCleanupTick(store, {}, tick);
+
+    assert.equal(result.lobbyRequestsTimedOut, 0);
+    const after = store.getLobbyRequest(room.slug, req.id);
+    assert.equal(after?.status, "denied");
+    assert.equal(after?.denialReason, "host_denied");
+  });
+});
+
+
+describe("Property: activity bump sets expiry exactly TTL in the future", () => {
+  /*
+   * Feature: room-expiry-and-cleanup, Property 1
+   * Validates: Requirements 1.2, 1.3, 1.6, 2.1
+   */
+  test("for any monotonic sequence of bumps, expiresAt always equals lastActivityAt + ROOM_TTL_MS", () => {
+    const startArb = fc.date({
+      min: new Date("2024-01-01T00:00:00Z"),
+      max: new Date("2030-01-01T00:00:00Z"),
+      noInvalidDate: true,
+    });
+    const dtSequenceArb = fc.array(fc.integer({ min: 0, max: 10 * 60 * 1000 }), {
+      minLength: 1,
+      maxLength: 6,
+    });
+
+    fc.assert(
+      fc.property(startArb, dtSequenceArb, (start, dts) => {
+        const store = createInMemoryRoomStore();
+        const room = store.createRoom(
+          {
+            accessMode: "open",
+            maxParticipants: 2,
+            qualityCap: "balanced",
+            allowScreenShare: true,
+          },
+          start,
+        );
+
+        let currentMs = start.getTime();
+        let previousLastActivityMs = Date.parse(room.lastActivityAt);
+        for (const dt of dts) {
+          currentMs += dt;
+          const bumpAt = new Date(currentMs);
+          recordRoomActivity(store, room.slug, bumpAt);
+
+          const fetched = store.getRoom(room.slug);
+          if (fetched == null) return;
+          const lastActivityMs = Date.parse(fetched.lastActivityAt);
+          const expiresAtMs = Date.parse(fetched.expiresAt);
+          assert.equal(expiresAtMs - lastActivityMs, ROOM_TTL_MS);
+          assert.ok(lastActivityMs >= previousLastActivityMs);
+          previousLastActivityMs = lastActivityMs;
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+describe("Property: expired-iff from expiresAt", () => {
+  /*
+   * Feature: room-expiry-and-cleanup, Property 2
+   * Validates: Requirements 1.3, 3.1
+   */
+  test("for any stored room and any now, getRoomStatus returns 'expired' iff now >= expiresAt", async () => {
+    const { getRoomStatus } = await import("./domain/room-status.js");
+
+    const baseArb = fc.date({
+      min: new Date("2024-01-01T00:00:00Z"),
+      max: new Date("2030-01-01T00:00:00Z"),
+      noInvalidDate: true,
+    });
+    const offsetArb = fc.integer({ min: -1000, max: 1000 });
+
+    fc.assert(
+      fc.property(baseArb, offsetArb, (expiresAt, offsetMs) => {
+        const expiresAtMs = expiresAt.getTime();
+        const nowMs = expiresAtMs + offsetMs;
+        const now = new Date(nowMs);
+
+        const room = {
+          slug: "Test",
+          accessMode: "open" as const,
+          maxParticipants: 2,
+          qualityCap: "balanced" as const,
+          allowScreenShare: true,
+          status: "active" as const,
+          expiresAt: expiresAt.toISOString(),
+          hostSecret: "stub-host-secret",
+          passcodeHash: null,
+          sessions: [],
+          lobbyRequests: [],
+          lastActivityAt: new Date(expiresAtMs - ROOM_TTL_MS).toISOString(),
+          closedAt: null,
+        };
+
+        const status = getRoomStatus(room, now);
+        if (nowMs >= expiresAtMs) {
+          assert.equal(status, "expired");
+        } else {
+          assert.notEqual(status, "expired");
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+describe("Property: no expiry before TTL elapses", () => {
+  /*
+   * Feature: room-expiry-and-cleanup, Property 3
+   * Validates: Requirement 3.2
+   */
+  test("for any activity bump at time t, getRoomStatus(now) != 'expired' for any now in [t, t + ROOM_TTL_MS)", async () => {
+    const { getRoomStatus } = await import("./domain/room-status.js");
+
+    const tArb = fc.integer({
+      min: Date.UTC(2024, 0, 1),
+      max: Date.UTC(2030, 0, 1),
+    });
+    const deltaArb = fc.integer({ min: 0, max: ROOM_TTL_MS - 1 });
+
+    fc.assert(
+      fc.property(tArb, deltaArb, (t, delta) => {
+        const store = createInMemoryRoomStore();
+        const bumpTime = new Date(t);
+        const room = store.createRoom(
+          {
+            accessMode: "open",
+            maxParticipants: 2,
+            qualityCap: "balanced",
+            allowScreenShare: true,
+          },
+          bumpTime,
+        );
+
+        const now = new Date(t + delta);
+        const status = getRoomStatus(room, now);
+        assert.notEqual(status, "expired");
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+describe("Property: expiry after TTL elapses", () => {
+  /*
+   * Feature: room-expiry-and-cleanup, Property 4
+   * Validates: Requirement 3.3
+   */
+  test("for any activity bump at time t and delta in [ROOM_TTL_MS, 2*ROOM_TTL_MS], getRoomStatus returns 'expired'", async () => {
+    const { getRoomStatus } = await import("./domain/room-status.js");
+
+    const tArb = fc.integer({
+      min: Date.UTC(2024, 0, 1),
+      max: Date.UTC(2030, 0, 1),
+    });
+    const deltaArb = fc.integer({ min: ROOM_TTL_MS, max: 2 * ROOM_TTL_MS });
+
+    fc.assert(
+      fc.property(tArb, deltaArb, (t, delta) => {
+        const store = createInMemoryRoomStore();
+        const bumpTime = new Date(t);
+        const room = store.createRoom(
+          {
+            accessMode: "open",
+            maxParticipants: 2,
+            qualityCap: "balanced",
+            allowScreenShare: true,
+          },
+          bumpTime,
+        );
+
+        const now = new Date(t + delta);
+        const status = getRoomStatus(room, now);
+        assert.equal(status, "expired");
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+describe("Property: cleanup correctly partitions rooms by fate", () => {
+  /*
+   * Feature: room-expiry-and-cleanup, Property 6
+   * Validates: Requirements 4.2, 4.5, 5.1, 5.2, 5.7, 6.2, 6.3
+   */
+  test("after one tick, surviving rooms match the closed-form partition rule", () => {
+    const scenarioArb = fc.record({
+      lastActivityOffsetMs: fc.integer({ min: -3 * ROOM_TTL_MS, max: 0 }),
+      isClosed: fc.boolean(),
+      closedAtOffsetMs: fc.integer({
+        min: -2 * CLOSED_ROOM_GRACE_WINDOW_MS,
+        max: 2 * CLOSED_ROOM_GRACE_WINDOW_MS,
+      }),
+      lobbyRequestAges: fc.array(
+        fc.integer({ min: 0, max: 2 * LOBBY_REQUEST_TTL_MS }),
+        { minLength: 0, maxLength: 3 },
+      ),
+    });
+
+    fc.assert(
+      fc.property(scenarioArb, (scenario) => {
+        const store = createInMemoryRoomStore();
+        const tickTime = new Date("2026-03-24T12:00:00Z");
+        const tickMs = tickTime.getTime();
+
+        const lastActivityAt = new Date(tickMs + scenario.lastActivityOffsetMs);
+        const room = store.createRoom(
+          {
+            accessMode: "lobby",
+            maxParticipants: 2,
+            qualityCap: "balanced",
+            allowScreenShare: true,
+            initialActivity: lastActivityAt.toISOString(),
+          },
+          lastActivityAt,
+        );
+
+        for (const age of scenario.lobbyRequestAges) {
+          store.createLobbyRequest(
+            room.slug,
+            "Guest",
+            new Date(tickMs - age).toISOString(),
+          );
+        }
+
+        if (scenario.isClosed) {
+          room.status = "closed";
+          room.closedAt = new Date(tickMs - scenario.closedAtOffsetMs).toISOString();
+        }
+
+        runCleanupTick(store, {}, tickTime);
+
+        // Compute the expected fate for the room.
+        const survived = store.getRoom(room.slug) != null;
+        if (scenario.isClosed) {
+          const closedAt = new Date(tickMs - scenario.closedAtOffsetMs).getTime();
+          const expected = closedAt + CLOSED_ROOM_GRACE_WINDOW_MS > tickMs;
+          assert.equal(survived, expected);
+        } else {
+          const expiresAt = Date.parse(room.expiresAt);
+          const expected = expiresAt > tickMs;
+          assert.equal(survived, expected);
+        }
+
+        // For surviving live rooms, no waiting lobby request remains past TTL.
+        if (survived && !scenario.isClosed) {
+          const stillWaiting = store.listLobbyRequests(room.slug);
+          for (const req of stillWaiting) {
+            assert.ok(
+              Date.parse(req.createdAt) + LOBBY_REQUEST_TTL_MS > tickMs,
+              "survivor has a stale waiting lobby request",
+            );
+          }
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+describe("Property: cleanup logs exactly one record per state change", () => {
+  /*
+   * Feature: room-expiry-and-cleanup, Property 7
+   * Validates: Requirements 9.1, 9.2, 9.3, 9.5
+   */
+  test("log record counts match CleanupResult counts for any scenario", () => {
+    const scenarioArb = fc.record({
+      roomCount: fc.integer({ min: 0, max: 4 }),
+      lastActivityOffsetMs: fc.integer({ min: -3 * ROOM_TTL_MS, max: 0 }),
+      lobbyRequestCount: fc.integer({ min: 0, max: 3 }),
+      lobbyRequestAgeMs: fc.integer({
+        min: 0,
+        max: 2 * LOBBY_REQUEST_TTL_MS,
+      }),
+    });
+
+    fc.assert(
+      fc.property(scenarioArb, (scenario) => {
+        const store = createInMemoryRoomStore();
+        const tickTime = new Date("2026-03-24T12:00:00Z");
+        const tickMs = tickTime.getTime();
+
+        for (let i = 0; i < scenario.roomCount; i += 1) {
+          const lastActivityAt = new Date(tickMs + scenario.lastActivityOffsetMs);
+          const room = store.createRoom(
+            {
+              accessMode: "lobby",
+              maxParticipants: 2,
+              qualityCap: "balanced",
+              allowScreenShare: true,
+              initialActivity: lastActivityAt.toISOString(),
+            },
+            lastActivityAt,
+          );
+
+          for (let r = 0; r < scenario.lobbyRequestCount; r += 1) {
+            store.createLobbyRequest(
+              room.slug,
+              `Guest-${r}`,
+              new Date(tickMs - scenario.lobbyRequestAgeMs).toISOString(),
+            );
+          }
+        }
+
+        const memLogger = createMemoryLogger();
+        const info = (fields: Record<string, unknown>) => {
+          memLogger.loggerOption.stream.write(JSON.stringify(fields) + "\n");
+        };
+        const logger = { info, error: () => {} };
+
+        const result = runCleanupTick(store, { logger }, tickTime);
+
+        const actions = cleanupActions(memLogger.readCapturedLogs());
+        const counts = {
+          room_idle_expired: actions.filter((a) => a === "room_idle_expired").length,
+          room_closed_reaped: actions.filter((a) => a === "room_closed_reaped").length,
+          lobby_request_timed_out: actions.filter((a) => a === "lobby_request_timed_out").length,
+        };
+
+        assert.equal(counts.room_idle_expired, result.expiredRoomsRemoved);
+        assert.equal(counts.room_closed_reaped, result.closedRoomsReaped);
+        assert.equal(counts.lobby_request_timed_out, result.lobbyRequestsTimedOut);
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+describe("Property: no secret ever appears in cleanup log records", () => {
+  /*
+   * Feature: room-expiry-and-cleanup, Property 8
+   * Validates: Requirement 9.4
+   */
+  test("for any passcode room that expires on a tick, cleanup logs never mention secrets", async () => {
+    const { buildApp: buildApp2 } = await import("./app.js");
+
+    const passcodeCharArb = fc
+      .array(
+        fc.integer({ min: 0x21, max: 0x7e }).map((code) => String.fromCodePoint(code)),
+        { minLength: 8, maxLength: 24 },
+      )
+      .map((chars) => chars.join(""));
+
+    await fc.assert(
+      fc.asyncProperty(passcodeCharArb, async (plaintext) => {
+        fc.pre(plaintext.trim() === plaintext);
+        fc.pre(!/\p{Cc}/u.test(plaintext));
+
+        const verifier = {
+          async hash(value: string) {
+            return `$fake$${value}`;
+          },
+          async verify(encodedHash: string, value: string) {
+            return encodedHash === `$fake$${value}`;
+          },
+        };
+
+        const store = createInMemoryRoomStore();
+        let simulated = new Date("2026-03-24T12:00:00Z");
+        const memLogger = createMemoryLogger();
+        const info = (fields: Record<string, unknown>) => {
+          memLogger.loggerOption.stream.write(JSON.stringify(fields) + "\n");
+        };
+        const errorFn = (fields: Record<string, unknown>) => {
+          memLogger.loggerOption.stream.write(JSON.stringify(fields) + "\n");
+        };
+        const logger = { info, error: errorFn };
+
+        const app = buildApp2({
+          logger: false,
+          liveKitConfig: TEST_LIVEKIT_CONFIG,
+          passcodeVerifier: verifier,
+          roomStore: store,
+          now: () => simulated,
+        });
+
+        const createResponse = await app.inject({
+          method: "POST",
+          url: "/api/rooms",
+          payload: { accessMode: "passcode", passcode: plaintext },
+        });
+        const { roomSlug, hostSecret } = createResponse.json() as {
+          roomSlug: string;
+          hostSecret: string;
+        };
+        const stored = store.getRoom(roomSlug);
+        const storedHash = stored?.passcodeHash ?? "";
+
+        // Advance past the TTL and fire one tick. The cleanup tick should
+        // expire and delete the room while emitting a log record.
+        simulated = new Date(simulated.getTime() + ROOM_TTL_MS + 1);
+        runCleanupTick(store, { logger }, simulated);
+
+        await app.close();
+
+        const capturedLogs = memLogger.readCapturedLogs();
+
+        assert.equal(
+          capturedLogs.includes(plaintext),
+          false,
+          "plaintext passcode leaked into cleanup logs",
+        );
+        assert.equal(
+          capturedLogs.includes(hostSecret),
+          false,
+          "host secret leaked into cleanup logs",
+        );
+        if (storedHash.length > 0) {
+          assert.equal(
+            capturedLogs.includes(storedHash),
+            false,
+            "passcode hash leaked into cleanup logs",
+          );
+        }
+      }),
+      { numRuns: 25 },
+    );
+  });
+});

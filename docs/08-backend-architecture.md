@@ -22,14 +22,28 @@ The backend is a Fastify application exposing REST endpoints and a WebSocket sig
   - lobby list, status, approve, and deny endpoints
 - `apps/server/src/routes/media.ts`
   - media token issuance endpoint
+- `apps/server/src/routes/settings.ts`
+  - host-only settings endpoint for access-mode changes and passcode rotation
+- `apps/server/src/routes/reclaim.ts`
+  - host-only reclaim endpoint for restoring host privileges after refresh
 - `apps/server/src/domain/room-validation.ts`
   - create/join/token request validation rules
 - `apps/server/src/domain/room-status.ts`
   - room status calculation and public room summary projection
 - `apps/server/src/domain/room-store.ts`
   - in-memory room store, session creation, and lobby request mutation logic
+- `apps/server/src/domain/room-activity.ts`
+  - `recordRoomActivity` helper that bumps `lastActivityAt` on sanctioned writes
+- `apps/server/src/domain/room-cleanup.ts`
+  - pure `runCleanupTick` and the `startCleanupLoop` scheduler wiring
+- `apps/server/src/domain/passcode-verifier.ts`
+  - Argon2id-backed passcode hashing and verification
+- `apps/server/src/domain/passcode-rate-limiter.ts`
+  - per-(IP, slug) sliding-window limiter for failed passcode submissions
+- `apps/server/src/domain/reclaim-rate-limiter.ts`
+  - per-(IP, slug) sliding-window limiter for failed reclaim submissions
 - `apps/server/src/server-support.ts`
-  - route-context creation, runtime wiring, expiry helper, and host-secret validation
+  - route-context creation, runtime wiring, and host-secret validation
 - `apps/server/src/livekit.ts`
   - LiveKit config loading and token signing
 - `apps/server/src/rooms.test.ts`
@@ -54,8 +68,15 @@ The backend is a Fastify application exposing REST endpoints and a WebSocket sig
   - create, approve, deny, and list lobby requests
 - `Media token service`
   - sign LiveKit access tokens for admitted sessions
+- `Cleanup loop`
+  - schedules `runCleanupTick(store, options, now)` on a configurable cadence (60 s in production, off in tests)
+  - removes idle-expired rooms whose `lastActivityAt + 2h` has elapsed
+  - times out waiting lobby requests older than 10 minutes with `reason: "lobby_timeout"`
+  - reaps closed rooms 5 minutes after `closedAt`
+  - emits structured info-level log records scoped under `event: "room_cleanup"` with actions `room_idle_expired`, `room_closed_reaped`, `lobby_request_timed_out`, and `tick_failed`
 - `App bootstrap layer`
   - compose Fastify with shared runtime context and route modules
+  - start the cleanup loop when `BuildAppOptions.cleanupIntervalMs > 0` and register an `onClose` hook to stop it
 
 ## Containerization Notes
 - The backend should ship as a Docker image and read all runtime configuration from environment variables.

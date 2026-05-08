@@ -177,3 +177,86 @@ test("lobby host endpoints require the host secret", async () => {
 
   await app.close();
 });
+
+
+test("Approving a lobby request bumps lastActivityAt on the host's room", async () => {
+  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+  const store = createInMemoryRoomStore();
+  let simulated = new Date("2026-03-24T12:00:00.000Z");
+  const app = buildApp({
+    now: () => simulated,
+    roomStore: store,
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+    payload: { accessMode: "lobby" },
+  });
+  const { roomSlug, hostSecret } = createResponse.json();
+  const beforeApprove = store.getRoom(roomSlug)?.lastActivityAt;
+
+  // Guest enters the lobby queue. This is a waiting join and must not bump.
+  simulated = new Date(simulated.getTime() + 60_000);
+  const joinResponse = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: { displayName: "Guest" },
+  });
+  const { requestId } = joinResponse.json();
+  assert.equal(store.getRoom(roomSlug)?.lastActivityAt, beforeApprove);
+
+  // Host approves. Activity clock must advance.
+  simulated = new Date(simulated.getTime() + 60_000);
+  const approveResponse = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/lobby/${requestId}/approve`,
+    headers: { "x-host-secret": hostSecret },
+  });
+  assert.equal(approveResponse.statusCode, 200);
+  const afterApprove = store.getRoom(roomSlug)?.lastActivityAt;
+  assert.equal(afterApprove, simulated.toISOString());
+
+  await app.close();
+});
+
+test("Denying a lobby request does NOT bump lastActivityAt", async () => {
+  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+  const store = createInMemoryRoomStore();
+  let simulated = new Date("2026-03-24T12:00:00.000Z");
+  const app = buildApp({
+    now: () => simulated,
+    roomStore: store,
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/api/rooms",
+    payload: { accessMode: "lobby" },
+  });
+  const { roomSlug, hostSecret } = createResponse.json();
+
+  simulated = new Date(simulated.getTime() + 60_000);
+  const joinResponse = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/join`,
+    payload: { displayName: "Guest" },
+  });
+  const { requestId } = joinResponse.json();
+  const beforeDeny = store.getRoom(roomSlug)?.lastActivityAt;
+
+  simulated = new Date(simulated.getTime() + 60_000);
+  const denyResponse = await app.inject({
+    method: "POST",
+    url: `/api/rooms/${roomSlug}/lobby/${requestId}/deny`,
+    headers: { "x-host-secret": hostSecret },
+  });
+  assert.equal(denyResponse.statusCode, 200);
+
+  const afterDeny = store.getRoom(roomSlug)?.lastActivityAt;
+  assert.equal(afterDeny, beforeDeny);
+
+  await app.close();
+});

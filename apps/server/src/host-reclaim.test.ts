@@ -741,3 +741,86 @@ describe("Property 4: Rate limiter safety under repeated failures", () => {
     );
   });
 });
+
+
+describe("Reclaim is not an activity-bumping operation", () => {
+  test("successful reclaim leaves lastActivityAt untouched", async () => {
+    const verifier = createFakeVerifier();
+    const { limiter } = await createSyncReclaimLimiter();
+    const store = createInMemoryRoomStore();
+    let simulated = new Date("2026-03-24T12:00:00.000Z");
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      passcodeVerifier: verifier,
+      reclaimRateLimiter: limiter,
+      roomStore: store,
+      now: () => simulated,
+    });
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+    });
+    const { roomSlug, hostSecret } = createResponse.json() as {
+      roomSlug: string;
+      hostSecret: string;
+    };
+    const beforeReclaim = store.getRoom(roomSlug)?.lastActivityAt;
+
+    simulated = new Date(simulated.getTime() + 30 * 60_000);
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/reclaim`,
+      headers: { "x-host-secret": hostSecret },
+    });
+    assert.equal(response.statusCode, 200);
+
+    const afterReclaim = store.getRoom(roomSlug)?.lastActivityAt;
+    assert.equal(afterReclaim, beforeReclaim);
+    await app.close();
+  });
+
+  test("409 reclaim leaves lastActivityAt untouched", async () => {
+    const verifier = createFakeVerifier();
+    const { limiter } = await createSyncReclaimLimiter();
+    const store = createInMemoryRoomStore();
+    let simulated = new Date("2026-03-24T12:00:00.000Z");
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      passcodeVerifier: verifier,
+      reclaimRateLimiter: limiter,
+      roomStore: store,
+      now: () => simulated,
+    });
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+    });
+    const { roomSlug, hostSecret } = createResponse.json() as {
+      roomSlug: string;
+      hostSecret: string;
+    };
+
+    // Mark the room closed so reclaim hits the 409 branch.
+    const stored = store.getRoom(roomSlug);
+    if (stored != null) {
+      stored.status = "closed";
+    }
+    const beforeReclaim = store.getRoom(roomSlug)?.lastActivityAt;
+
+    simulated = new Date(simulated.getTime() + 30 * 60_000);
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/reclaim`,
+      headers: { "x-host-secret": hostSecret },
+    });
+    assert.equal(response.statusCode, 409);
+
+    const afterReclaim = store.getRoom(roomSlug)?.lastActivityAt;
+    assert.equal(afterReclaim, beforeReclaim);
+    await app.close();
+  });
+});
