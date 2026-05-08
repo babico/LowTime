@@ -169,6 +169,7 @@ describe("runCleanupTick", () => {
       expiredRoomsRemoved: 0,
       closedRoomsReaped: 0,
       lobbyRequestsTimedOut: 0,
+      sessionsExpired: 0,
     });
     assert.equal(cleanupActions(memLogger.readCapturedLogs()).length, 0);
   });
@@ -323,10 +324,136 @@ describe("runCleanupTick", () => {
       expiredRoomsRemoved: 0,
       closedRoomsReaped: 0,
       lobbyRequestsTimedOut: 0,
+      sessionsExpired: 0,
     });
     // Second tick must not add any new cleanup log records.
     const secondLogs = memLogger.readCapturedLogs().slice(firstLogs.length);
     assert.equal(cleanupActions(secondLogs).length, 0);
+  });
+});
+
+describe("runCleanupTick: session reaper", () => {
+  function seedRoomWithSession(
+    store: ReturnType<typeof createInMemoryRoomStore>,
+    t0: Date,
+  ) {
+    const room = store.createRoom(
+      { accessMode: "open", maxParticipants: 2, qualityCap: "balanced", allowScreenShare: true },
+      t0,
+    );
+    const session = store.createSession(room.slug, "Alice", t0);
+    assert.ok(session != null);
+    return { room, session };
+  }
+
+  test("reaper removes sessions whose lastSeenAt + RECONNECT_WINDOW_MS has elapsed", async () => {
+    const { RECONNECT_WINDOW_MS } = await import("@lowtime/shared");
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const { room, session } = seedRoomWithSession(store, t0);
+
+    const tick = new Date(t0.getTime() + RECONNECT_WINDOW_MS + 1);
+    const result = runCleanupTick(store, {}, tick);
+
+    assert.equal(result.sessionsExpired, 1);
+    const fetched = store.getRoom(room.slug);
+    assert.ok(fetched != null);
+    assert.equal(fetched.sessions.find((s) => s.id === session.id), undefined);
+  });
+
+  test("reaper preserves sessions whose lastSeenAt + RECONNECT_WINDOW_MS has NOT elapsed", async () => {
+    const { RECONNECT_WINDOW_MS } = await import("@lowtime/shared");
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const { room, session } = seedRoomWithSession(store, t0);
+
+    const tick = new Date(t0.getTime() + RECONNECT_WINDOW_MS - 1);
+    const result = runCleanupTick(store, {}, tick);
+
+    assert.equal(result.sessionsExpired, 0);
+    const fetched = store.getRoom(room.slug);
+    assert.ok(fetched?.sessions.find((s) => s.id === session.id) != null);
+  });
+
+  test("reaper emits exactly one session_expired log record per reaped session", async () => {
+    const { RECONNECT_WINDOW_MS } = await import("@lowtime/shared");
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const { session } = seedRoomWithSession(store, t0);
+
+    const memLogger = createMemoryLogger();
+    const info = (fields: Record<string, unknown>) => {
+      memLogger.loggerOption.stream.write(JSON.stringify(fields) + "\n");
+    };
+    const logger = { info, error: () => {} };
+
+    const tick = new Date(t0.getTime() + RECONNECT_WINDOW_MS + 1);
+    runCleanupTick(store, { logger }, tick);
+
+    const actions = cleanupActions(memLogger.readCapturedLogs());
+    assert.equal(actions.filter((a) => a === "session_expired").length, 1);
+
+    const logLines = memLogger.readCapturedLogs()
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .map((l) => JSON.parse(l) as Record<string, unknown>);
+    const record = logLines.find((l) => l.action === "session_expired");
+    assert.ok(record != null);
+    assert.equal(record.sessionId, session.id);
+  });
+
+  test("reaper is idempotent: second tick at same now produces no additional reaps", async () => {
+    const { RECONNECT_WINDOW_MS } = await import("@lowtime/shared");
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    seedRoomWithSession(store, t0);
+
+    const tick = new Date(t0.getTime() + RECONNECT_WINDOW_MS + 1);
+    const first = runCleanupTick(store, {}, tick);
+    const second = runCleanupTick(store, {}, tick);
+
+    assert.equal(first.sessionsExpired, 1);
+    assert.equal(second.sessionsExpired, 0);
+  });
+
+  test("reaper does NOT run on closed rooms", async () => {
+    const { RECONNECT_WINDOW_MS } = await import("@lowtime/shared");
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const { room, session } = seedRoomWithSession(store, t0);
+    room.status = "closed";
+    room.closedAt = t0.toISOString();
+
+    // Tick well past the reconnect window but INSIDE the closed-room grace window.
+    // RECONNECT_WINDOW_MS == CLOSED_ROOM_GRACE_WINDOW_MS == 5 min, so we use
+    // a tick that is past the reconnect window but before the grace window ends.
+    // We set closedAt to a future time so the grace window hasn't elapsed yet.
+    const futureClose = new Date(t0.getTime() + RECONNECT_WINDOW_MS + 10_000);
+    room.closedAt = futureClose.toISOString();
+
+    const tick = new Date(t0.getTime() + RECONNECT_WINDOW_MS + 1);
+    const result = runCleanupTick(store, {}, tick);
+
+    assert.equal(result.sessionsExpired, 0);
+    // Room itself is still present (inside grace window).
+    const fetched = store.getRoom(room.slug);
+    assert.ok(fetched != null);
+    assert.ok(fetched.sessions.find((s) => s.id === session.id) != null);
+  });
+
+  test("reaper does NOT run on expired rooms (they are deleted wholesale)", async () => {
+    const { RECONNECT_WINDOW_MS } = await import("@lowtime/shared");
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const { room } = seedRoomWithSession(store, t0);
+
+    // Tick past both the room TTL and the reconnect window.
+    const tick = new Date(t0.getTime() + ROOM_TTL_MS + RECONNECT_WINDOW_MS + 1);
+    const result = runCleanupTick(store, {}, tick);
+
+    assert.equal(result.expiredRoomsRemoved, 1);
+    assert.equal(result.sessionsExpired, 0);
+    assert.equal(store.getRoom(room.slug), undefined);
   });
 });
 
@@ -571,6 +698,7 @@ describe("Property: cleanup tick is idempotent for any in-memory store snapshot"
           expiredRoomsRemoved: 0,
           closedRoomsReaped: 0,
           lobbyRequestsTimedOut: 0,
+          sessionsExpired: 0,
         });
         assert.equal(snapshotAfterFirst, snapshotAfterSecond);
         void firstResult;
@@ -597,7 +725,7 @@ describe("runCleanupTick: lobby request state preservation", () => {
     const req = store.createLobbyRequest(room.slug, "Guest", t0.toISOString());
     assert.ok(req != null);
     // Approve so the request enters the `"approved"` state.
-    store.approveLobbyRequest(room.slug, req.id);
+    store.approveLobbyRequest(room.slug, req.id, t0);
 
     const tick = new Date(t0.getTime() + LOBBY_REQUEST_TTL_MS + 1);
     const result = runCleanupTick(store, {}, tick);

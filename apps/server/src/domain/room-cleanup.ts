@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 
+import { RECONNECT_WINDOW_MS } from "@lowtime/shared";
 import { getRoomStatus } from "./room-status.js";
 import type { RoomStore } from "./room-store.js";
 
@@ -19,6 +20,7 @@ export interface CleanupResult {
   expiredRoomsRemoved: number;
   closedRoomsReaped: number;
   lobbyRequestsTimedOut: number;
+  sessionsExpired: number;
 }
 
 /**
@@ -52,6 +54,7 @@ export function runCleanupTick(
   let expiredRoomsRemoved = 0;
   let closedRoomsReaped = 0;
   let lobbyRequestsTimedOut = 0;
+  let sessionsExpired = 0;
 
   for (const slug of store.listRoomSlugs()) {
     const room = store.getRoom(slug);
@@ -110,9 +113,27 @@ export function runCleanupTick(
         "lobby request timed out",
       );
     }
+
+    // Still-live room: reap sessions whose reconnect window has elapsed.
+    for (const session of [...room.sessions]) {
+      if (Date.parse(session.lastSeenAt) + RECONNECT_WINDOW_MS > tickNow) continue;
+
+      store.deleteSession(slug, session.id);
+      sessionsExpired += 1;
+      logger?.info(
+        {
+          event: "room_cleanup",
+          action: "session_expired",
+          roomSlug: slug,
+          sessionId: session.id,
+          lastSeenAt: session.lastSeenAt,
+        },
+        "session expired",
+      );
+    }
   }
 
-  return { expiredRoomsRemoved, closedRoomsReaped, lobbyRequestsTimedOut };
+  return { expiredRoomsRemoved, closedRoomsReaped, lobbyRequestsTimedOut, sessionsExpired };
 }
 
 export interface CleanupScheduler {

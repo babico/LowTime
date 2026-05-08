@@ -1,5 +1,8 @@
 export type RoomSlug = string;
 
+/** Five minutes. Shared reconnect-window constant used by both server and web client. */
+export const RECONNECT_WINDOW_MS = 5 * 60 * 1000;
+
 export type AccessMode = "open" | "lobby" | "passcode";
 
 export type QualityCap = "low" | "balanced" | "high";

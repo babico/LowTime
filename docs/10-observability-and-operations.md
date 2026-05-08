@@ -90,5 +90,6 @@ B --> K
   - `room_idle_expired`: a room was removed because `now >= lastActivityAt + 2h`.
   - `room_closed_reaped`: a room whose `status === "closed"` was removed after the 5-minute grace window.
   - `lobby_request_timed_out`: a waiting lobby request older than 10 minutes transitioned to `{ status: "denied", reason: "lobby_timeout" }`.
+  - `session_expired`: a session whose `lastSeenAt + RECONNECT_WINDOW_MS (5 min)` has elapsed was removed from a live room. Fields: `roomSlug`, `sessionId`, `lastSeenAt`.
   - `tick_failed`: `error` level; a single cleanup tick threw; subsequent ticks continue.
   Structured cleanup counters for dashboards are deferred to the observability roadmap.

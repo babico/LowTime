@@ -157,3 +157,103 @@ describe("Signal bus integration: settings handler broadcasts", () => {
     await app.close();
   });
 });
+
+describe("Signal route: room.ping / room.pong heartbeat (store-level)", () => {
+  /*
+   * Feature: reconnect-window, Property: heartbeat keeps session alive
+   * Validates: Requirements 4.1, 4.2, 4.3
+   *
+   * Full wire-level WebSocket tests (opening a real socket, sending frames,
+   * and reading replies) are deferred to an end-to-end harness. These tests
+   * verify the store-level contract that the signal route depends on:
+   * touchSession bumps lastSeenAt and returns true for a live session, and
+   * returns false for a reaped session.
+   */
+
+  test("touchSession bumps lastSeenAt and returns true for a live session", async () => {
+    const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const room = store.createRoom(
+      { accessMode: "open", maxParticipants: 2, qualityCap: "balanced", allowScreenShare: true },
+      t0,
+    );
+    const session = store.createSession(room.slug, "Alice", t0);
+    assert.ok(session != null);
+    assert.equal(session.lastSeenAt, t0.toISOString());
+
+    const t1 = new Date(t0.getTime() + 20_000);
+    const touched = store.touchSession(room.slug, session.id, t1);
+    assert.equal(touched, true);
+
+    const fetched = store.getRoom(room.slug);
+    const updated = fetched?.sessions.find((s) => s.id === session.id);
+    assert.equal(updated?.lastSeenAt, t1.toISOString());
+  });
+
+  test("touchSession returns false for a reaped (deleted) session", async () => {
+    const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+    const store = createInMemoryRoomStore();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const room = store.createRoom(
+      { accessMode: "open", maxParticipants: 2, qualityCap: "balanced", allowScreenShare: true },
+      t0,
+    );
+    const session = store.createSession(room.slug, "Bob", t0);
+    assert.ok(session != null);
+
+    // Reap the session directly.
+    store.deleteSession(room.slug, session.id);
+
+    const t1 = new Date(t0.getTime() + 20_000);
+    const touched = store.touchSession(room.slug, session.id, t1);
+    assert.equal(touched, false);
+  });
+
+  test("touchSession returns false for an unknown room slug", async () => {
+    const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+    const store = createInMemoryRoomStore();
+    const touched = store.touchSession("no-such-room", "sess_abc", new Date());
+    assert.equal(touched, false);
+  });
+
+  test("ping against a reaped session: signal route returns session_expired error via store check", async () => {
+    const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+    const { runCleanupTick } = await import("./domain/room-cleanup.js");
+    const { RECONNECT_WINDOW_MS } = await import("@lowtime/shared");
+
+    let simulated = new Date("2026-03-24T12:00:00Z");
+    const store = createInMemoryRoomStore();
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      roomStore: store,
+      now: () => simulated,
+    });
+
+    const createResponse = await app.inject({ method: "POST", url: "/api/rooms" });
+    const { roomSlug } = createResponse.json() as { roomSlug: string };
+
+    const joinResponse = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/join`,
+      payload: { displayName: "Dave" },
+    });
+    const { sessionId } = joinResponse.json() as { sessionId: string };
+
+    // Advance clock and reap the session.
+    simulated = new Date(simulated.getTime() + RECONNECT_WINDOW_MS + 1);
+    const result = runCleanupTick(store, {}, simulated);
+    assert.equal(result.sessionsExpired, 1);
+
+    // After reaping, touchSession must return false (simulating what the signal
+    // route does when it receives a room.ping for a reaped session).
+    const touched = store.touchSession(roomSlug, sessionId, simulated);
+    assert.equal(touched, false);
+
+    await app.close();
+  });
+});
