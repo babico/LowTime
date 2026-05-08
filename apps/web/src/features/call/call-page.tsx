@@ -6,6 +6,7 @@ import { getNetworkHealthLabel } from "../../network-health.js";
 import type { DowngradeRung } from "../../auto-downgrade.js";
 import { getRungLabel } from "../../auto-downgrade.js";
 import type { PromptState } from "../../audio-only-prompt.js";
+import type { P2PCallStatus } from "./call-effects.js";
 import {
   callFactsStyle,
   callHeaderBadgeRowStyle,
@@ -48,6 +49,8 @@ interface CallPageProps {
   slug: string;
   downgradeRung: DowngradeRung;
   audioOnlyPromptState: PromptState;
+  p2pStatus: P2PCallStatus;
+  p2pError: string | null;
   onBackToJoin: () => void;
   onLeaveCall: () => void;
   onRestoreQuality: () => void;
@@ -58,6 +61,10 @@ interface CallPageProps {
 }
 
 export function CallPage(props: CallPageProps) {
+  const isP2PNegotiating = props.p2pStatus === "negotiating" || props.p2pStatus === "requesting_token";
+  const isP2PConnected = props.p2pStatus === "connected";
+  const controlsDisabled = (props.callStatus !== "connected" && !isP2PConnected) || isP2PNegotiating;
+
   return (
     <main style={callPageStyle}>
       <section style={callHeaderStyle}>
@@ -74,6 +81,13 @@ export function CallPage(props: CallPageProps) {
           </div>
         </div>
       </section>
+      {isP2PNegotiating ? (
+        <section role="status" aria-live="polite" aria-label="Connection transition">
+          <p style={mutedParagraphStyle}>
+            <strong>Switching to direct connection</strong>
+          </p>
+        </section>
+      ) : null}
       {props.downgradeRung !== "none" ? (
         <section role="status" aria-live="polite">
           <p style={mutedParagraphStyle}>
@@ -118,7 +132,7 @@ export function CallPage(props: CallPageProps) {
               <div style={tilePlaceholderStyle}>
                 <strong>{props.remoteParticipantLabel}</strong>
                 <p style={mutedParagraphStyle}>
-                  {props.callStatus === "connected"
+                  {props.callStatus === "connected" || isP2PConnected
                     ? "No remote camera is visible yet."
                     : "Connecting the first call experience..."}
                 </p>
@@ -149,7 +163,7 @@ export function CallPage(props: CallPageProps) {
             <dl style={callFactsStyle}>
               <div>
                 <dt>Transport</dt>
-                <dd><code>{props.callSession.transportPreference}</code></dd>
+                <dd><code>{isP2PConnected ? "p2p" : props.callSession.transportPreference}</code></dd>
               </div>
               <div>
                 <dt>Participants</dt>
@@ -174,7 +188,7 @@ export function CallPage(props: CallPageProps) {
             <button
               type="button"
               onClick={() => void props.onToggleMicrophone()}
-              disabled={props.callStatus !== "connected" || props.isTogglingMic}
+              disabled={controlsDisabled || props.isTogglingMic}
               style={secondaryControlStyle}
             >
               {props.isTogglingMic ? "Updating Mic..." : props.isMicEnabled ? "Mute" : "Unmute"}
@@ -182,7 +196,7 @@ export function CallPage(props: CallPageProps) {
             <button
               type="button"
               onClick={() => void props.onToggleCamera()}
-              disabled={props.callStatus !== "connected" || props.isTogglingCamera}
+              disabled={controlsDisabled || props.isTogglingCamera}
               style={secondaryControlStyle}
             >
               {props.isTogglingCamera ? "Updating Camera..." : props.isCameraEnabled ? "Turn Camera Off" : "Turn Camera On"}
@@ -192,10 +206,16 @@ export function CallPage(props: CallPageProps) {
             </button>
           </section>
           {props.callError ? <p role="alert">{props.callError}</p> : null}
+          {props.p2pError && props.p2pStatus === "failed" ? (
+            <p role="alert">{props.p2pError}</p>
+          ) : null}
         </section>
       ) : (
         <>
           {props.callError ? <p role="alert">{props.callError}</p> : null}
+          {props.p2pError && props.p2pStatus === "failed" ? (
+            <p role="alert">{props.p2pError}</p>
+          ) : null}
           <button type="button" onClick={props.onBackToJoin}>
             Back To Join Screen
           </button>

@@ -1,12 +1,42 @@
 import type { FastifyInstance } from "fastify";
-import type { MediaTokenRequest, MediaTokenResponse } from "@lowtime/shared";
+import type {
+  IceServerConfig,
+  MediaTokenRequest,
+  MediaTokenResponse,
+  P2PTokenResponse,
+} from "@lowtime/shared";
 
 import { getRoomStatus } from "../domain/room-status.js";
+import type { StoredRoom } from "../domain/room-store.js";
 import { validateMediaTokenRequest } from "../domain/room-validation.js";
 import { issueSfuToken } from "../livekit.js";
 import {
   type RouteContext,
 } from "../server-support.js";
+
+export interface IssueP2PTokenInput {
+  room: StoredRoom;
+  sessionId: string;
+  iceServers: IceServerConfig[];
+}
+
+/**
+ * Pure helper that assigns caller/callee roles by session index and returns
+ * a `P2PTokenResponse`. The first session in the room's session list is
+ * always the caller; the second is always the callee. This is deterministic
+ * and idempotent for any given (room, sessionId) pair.
+ */
+export function issueP2PToken(input: IssueP2PTokenInput): P2PTokenResponse {
+  const sessionIndex = input.room.sessions.findIndex((s) => s.id === input.sessionId);
+  const offerRole: "caller" | "callee" = sessionIndex === 0 ? "caller" : "callee";
+  return {
+    transport: "p2p",
+    p2pSession: {
+      offerRole,
+      iceServers: input.iceServers,
+    },
+  };
+}
 
 export function registerMediaRoutes(app: FastifyInstance, context: RouteContext) {
   app.post<{ Params: { slug: string }; Body: MediaTokenRequest; Reply: MediaTokenResponse | { message: string } }>(
@@ -50,6 +80,21 @@ export function registerMediaRoutes(app: FastifyInstance, context: RouteContext)
 
       // Bump lastSeenAt so the session stays fresh while the client is active.
       context.roomStore.touchSession(room.slug, session.id, context.now());
+
+      // P2P transport branch.
+      if (validation.value.transportPreference === "p2p") {
+        if (room.maxParticipants !== 2) {
+          reply.code(400);
+          return {
+            message: "P2P transport is only available for 1:1 rooms",
+          };
+        }
+        return issueP2PToken({
+          room,
+          sessionId: session.id,
+          iceServers: context.iceServers,
+        });
+      }
 
       if (validation.value.transportPreference !== "sfu") {
         reply.code(400);

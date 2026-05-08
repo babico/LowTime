@@ -8,6 +8,7 @@ import type { RoomSlug, RoomSummary } from "@lowtime/shared";
 export type SignalServerEvent =
   | { kind: "room.snapshot"; room: RoomSummary }
   | { kind: "room.settings_updated"; room: RoomSummary }
+  | { kind: "transport.switch_available"; nextTransport: "p2p" }
   | { kind: "error"; code: string; message: string };
 
 export type SignalHandler = (event: SignalServerEvent) => void;

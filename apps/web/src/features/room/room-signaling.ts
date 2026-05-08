@@ -8,12 +8,23 @@ export type SignalState = "idle" | "connecting" | "connected" | "error" | "close
 export type SignalServerEvent =
   | { kind: "room.snapshot"; room: RoomSummary }
   | { kind: "room.settings_updated"; room: RoomSummary }
+  | { kind: "transport.switch_available"; nextTransport: "p2p" }
+  | { kind: "p2p.offer"; payload: { sdp: string } }
+  | { kind: "p2p.answer"; payload: { sdp: string } }
+  | { kind: "p2p.ice"; payload: RTCIceCandidateInit }
   | { kind: "error"; code: string; message: string };
+
+export type P2PSignalEvent =
+  | { kind: "p2p.offer"; payload: { sdp: string } }
+  | { kind: "p2p.answer"; payload: { sdp: string } }
+  | { kind: "p2p.ice"; payload: RTCIceCandidateInit };
 
 export interface UseRoomSignalingInput {
   apiBaseUrl: string;
   slug: string | null;
   sessionId: string | null;
+  /** Called when a p2p.offer, p2p.answer, or p2p.ice message arrives from the server. */
+  onP2PMessage?: (event: P2PSignalEvent) => void;
 }
 
 export interface UseRoomSignalingState {
@@ -21,6 +32,10 @@ export interface UseRoomSignalingState {
   latestRoomSummary: RoomSummary | null;
   /** True when the server has indicated the session has expired and the user must rejoin. */
   sessionExpired: boolean;
+  /** True when the server has indicated P2P fallback is available for this room. */
+  p2pAvailable: boolean;
+  /** Send a raw message frame to the server. No-op if socket is not open. */
+  sendSignalMessage: (message: Record<string, unknown>) => void;
 }
 
 /**
@@ -54,11 +69,25 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
   const [signalState, setSignalState] = useState<SignalState>("idle");
   const [latestRoomSummary, setLatestRoomSummary] = useState<RoomSummary | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [p2pAvailable, setP2pAvailable] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onP2PMessageRef = useRef(input.onP2PMessage);
+  onP2PMessageRef.current = input.onP2PMessage;
 
   /** Ping interval: 20s (well within the 5-minute reconnect window). */
   const PING_INTERVAL_MS = Math.floor(RECONNECT_WINDOW_MS / 15);
+
+  // sendSignalMessage is stable across renders — it reads socketRef at call time.
+  const sendSignalMessage = useRef((message: Record<string, unknown>) => {
+    const sock = socketRef.current;
+    if (sock == null || sock.readyState !== WebSocket.OPEN) return;
+    try {
+      sock.send(JSON.stringify(message));
+    } catch {
+      // Ignore; the close handler will clean up.
+    }
+  }).current;
 
   useEffect(() => {
     if (slug == null || sessionId == null) {
@@ -118,6 +147,10 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
           startPing();
         } else if (raw.kind === "room.pong") {
           // Server acknowledged our ping; session is still alive. No state change needed.
+        } else if (raw.kind === "transport.switch_available") {
+          setP2pAvailable(true);
+        } else if (raw.kind === "p2p.offer" || raw.kind === "p2p.answer" || raw.kind === "p2p.ice") {
+          onP2PMessageRef.current?.(raw as unknown as P2PSignalEvent);
         } else if (raw.kind === "error") {
           if (raw.code === "session_expired") {
             setSessionExpired(true);
@@ -153,5 +186,5 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
     };
   }, [apiBaseUrl, slug, sessionId]);
 
-  return { signalState, latestRoomSummary, sessionExpired };
+  return { signalState, latestRoomSummary, sessionExpired, p2pAvailable, sendSignalMessage };
 }
