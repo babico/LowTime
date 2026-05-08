@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { RoomSummary } from "@lowtime/shared";
+import type { ChatMessage, RoomSummary } from "@lowtime/shared";
 import { RECONNECT_WINDOW_MS } from "@lowtime/shared";
 
 export type SignalState = "idle" | "connecting" | "connected" | "error" | "closed";
@@ -9,6 +9,7 @@ export type SignalServerEvent =
   | { kind: "room.snapshot"; room: RoomSummary }
   | { kind: "room.settings_updated"; room: RoomSummary }
   | { kind: "transport.switch_available"; nextTransport: "p2p" }
+  | { kind: "chat.received"; message: ChatMessage }
   | { kind: "p2p.offer"; payload: { sdp: string } }
   | { kind: "p2p.answer"; payload: { sdp: string } }
   | { kind: "p2p.ice"; payload: RTCIceCandidateInit }
@@ -34,6 +35,8 @@ export interface UseRoomSignalingState {
   sessionExpired: boolean;
   /** True when the server has indicated P2P fallback is available for this room. */
   p2pAvailable: boolean;
+  /** Ordered list of chat messages received since the socket connected. */
+  chatMessages: ChatMessage[];
   /** Send a raw message frame to the server. No-op if socket is not open. */
   sendSignalMessage: (message: Record<string, unknown>) => void;
 }
@@ -70,6 +73,7 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
   const [latestRoomSummary, setLatestRoomSummary] = useState<RoomSummary | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [p2pAvailable, setP2pAvailable] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onP2PMessageRef = useRef(input.onP2PMessage);
@@ -149,6 +153,9 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
           // Server acknowledged our ping; session is still alive. No state change needed.
         } else if (raw.kind === "transport.switch_available") {
           setP2pAvailable(true);
+        } else if (raw.kind === "chat.received") {
+          const msg = (raw as { kind: string; message: ChatMessage }).message;
+          setChatMessages((prev) => [...prev, msg]);
         } else if (raw.kind === "p2p.offer" || raw.kind === "p2p.answer" || raw.kind === "p2p.ice") {
           onP2PMessageRef.current?.(raw as unknown as P2PSignalEvent);
         } else if (raw.kind === "error") {
@@ -186,5 +193,5 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
     };
   }, [apiBaseUrl, slug, sessionId]);
 
-  return { signalState, latestRoomSummary, sessionExpired, p2pAvailable, sendSignalMessage };
+  return { signalState, latestRoomSummary, sessionExpired, p2pAvailable, chatMessages, sendSignalMessage };
 }

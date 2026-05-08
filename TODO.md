@@ -67,7 +67,7 @@
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| Lightweight in-room chat | `planned` | Ephemeral signaling-backed chat | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
+| Lightweight in-room chat | `done` | Issue #23. Added ephemeral `chat.send`/`chat.received` signaling, `ChatPanel` component on the call page, `chatMessages` state in `useRoomSignaling`, and `ChatMessage` type in shared package | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
 | Desktop screen share | `planned` | Hide on unsupported browsers | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Device switching | `planned` | Front/back camera and mic/speaker selection where supported | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Pause incoming video control | `planned` | User-level bandwidth control | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |

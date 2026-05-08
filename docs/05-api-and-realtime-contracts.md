@@ -167,9 +167,11 @@ Current implementation notes:
 ### Currently Implemented
 - **Client → server**: `room.connect` with `{ kind: "room.connect", roomSlug, sessionId }` as the first frame. Any other first frame returns `{ kind: "error", code: "bad_connect" }` and closes the socket. Unknown slug or unknown `sessionId` returns `{ kind: "error", code: "unauthorized" }` and closes.
 - **Client → server**: `room.ping` with `{ kind: "room.ping" }` sent every 20 seconds while connected. The server bumps `lastSeenAt` on the session and replies with `{ kind: "room.pong", serverTime: <ISO-8601> }`. If the session has already been reaped, the server replies with `{ kind: "error", code: "session_expired", message: "Session expired; rejoin the room" }` and closes the socket.
+- **Client → server**: `chat.send` with `{ kind: "chat.send", body: string }` to send a chat message. The body must be 1–500 characters. The server broadcasts `{ kind: "chat.received", message: ChatMessage }` to all connected sessions in the room via the signal bus.
 - **Server → client**: on a successful connect, the server immediately sends `{ kind: "room.snapshot", room: RoomSummary }`. While connected, every accepted `POST /api/rooms/:slug/settings` call fans out `{ kind: "room.settings_updated", room: RoomSummary }` to every subscribed socket on that slug.
 - **Server → client** `room.pong`: `{ kind: "room.pong", serverTime: <ISO-8601> }` in response to a `room.ping`. Clients treat this as a keep-alive acknowledgement and do not surface it to consumers.
-- **Server → client** error shape: `{ kind: "error", code, message }`. Known codes: `bad_message`, `bad_connect`, `unauthorized`, `unsupported_message`, `session_expired`.
+- **Server → client** `chat.received`: `{ kind: "chat.received", message: ChatMessage }` broadcast to all connected sessions when any participant sends a `chat.send`. Chat is ephemeral — messages are not persisted and are lost when the room is reaped.
+- **Server → client** error shape: `{ kind: "error", code, message }`. Known codes: `bad_message`, `bad_connect`, `unauthorized`, `unsupported_message`, `session_expired`, `invalid_message`.
 
 ### Deferred
 The event tables below enumerate the full planned signaling surface. Everything except `room.connect`, `room.snapshot`, `room.settings_updated`, and the `error` frame is still planned.
