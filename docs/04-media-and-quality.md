@@ -91,6 +91,8 @@ AudioOnlySuggested --> Healthy: network recovers and user re-enables video
 VideoPaused --> Healthy: network recovers and policy allows restore
 ```
 
+`VideoPaused → AudioOnlySuggested` is implemented by [`apps/web/src/audio-only-prompt.ts`](../apps/web/src/audio-only-prompt.ts). After 30 consecutive seconds at the `"video-paused"` downgrade rung, a `role="dialog"` banner on the call page offers "Continue audio-only" (locks the session into audio-only by flipping `advancedPrefs.audioOnly = true`) or "Keep trying video" (dismisses for a 60 second cooldown so the auto-downgrade hook can continue to walk the ladder if the network recovers).
+
 ## Screen Share Rules
 - Support desktop screen share in browsers that expose screen-capture APIs.
 - Hide the control on unsupported devices instead of blocking call entry.

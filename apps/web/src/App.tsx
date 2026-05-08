@@ -22,6 +22,7 @@ import {
 import { useCallFlow } from "./features/call/call-effects.js";
 import { useInstallPrompt } from "./features/home/install-effects.js";
 import { useAutoDowngrade } from "./auto-downgrade.js";
+import { useAudioOnlyPrompt } from "./audio-only-prompt.js";
 import { computeEffectivePublishOptions } from "./quality-presets.js";
 import { joinRoomRequest, submitLobbyAction } from "./features/room/room-actions.js";
 import { useDevicePreview } from "./features/room/preview-effects.js";
@@ -171,12 +172,36 @@ export function App() {
     });
   }, [callSession, roomSummary?.qualityCap]);
 
-  const { rung: downgradeRung, restore: restoreQuality } = useAutoDowngrade({
+  const { rung: downgradeRung, lastTransitionAt, restore: restoreQuality } = useAutoDowngrade({
     callStatus,
     networkHealth,
     room: callRoom,
     basePublishOptions,
   });
+
+  const { promptState: audioOnlyPromptState, accept: acceptAudioOnlyPrompt, dismiss: dismissAudioOnlyPrompt } =
+    useAudioOnlyPrompt({
+      rung: downgradeRung,
+      lastRungTransitionAt: lastTransitionAt,
+    });
+
+  // Accepting the audio-only suggestion locks the session into audio-only by
+  // updating the stored session and bumping advanced prefs on the fly. The
+  // auto-downgrade hook then keeps the ladder at its current rung because
+  // `basePublishOptions.audioOnly` is now true.
+  const handleAcceptAudioOnly = useCallback(() => {
+    acceptAudioOnlyPrompt();
+    if (viewState.kind === "call" && callSession != null) {
+      const nextSession = {
+        ...callSession,
+        advancedPrefs: {
+          ...(callSession.advancedPrefs ?? {}),
+          audioOnly: true,
+        },
+      };
+      saveStoredCallSession(window.sessionStorage, viewState.slug, nextSession);
+    }
+  }, [acceptAudioOnlyPrompt, callSession, viewState]);
   const {
     handleInstallApp,
     installMessage,
@@ -405,6 +430,7 @@ export function App() {
   return (
     <AppShell
       callPageProps={{
+        audioOnlyPromptState,
         callError,
         callParticipants,
         callSession,
@@ -419,6 +445,8 @@ export function App() {
         isTogglingMic,
         localVideoRef,
         networkHealth,
+        onAcceptAudioOnly: handleAcceptAudioOnly,
+        onDismissAudioOnly: dismissAudioOnlyPrompt,
         onLeaveCall: handleLeaveCall,
         onRestoreQuality: restoreQuality,
         onToggleCamera: handleToggleCamera,
