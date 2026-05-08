@@ -55,7 +55,12 @@ export function registerSettingsRoutes(app: FastifyInstance, context: RouteConte
     if (decision.kind === "set-quality-cap") {
       room.qualityCap = decision.qualityCap;
       recordRoomActivity(context.roomStore, room.slug, context.now());
-      return { room: toRoomSummary(room, context.now()) };
+      const summary = toRoomSummary(room, context.now());
+      context.signalBus.publish(room.slug, {
+        kind: "room.settings_updated",
+        room: summary,
+      });
+      return { room: summary };
     }
 
     if (decision.kind === "clear-passcode") {
@@ -63,7 +68,12 @@ export function registerSettingsRoutes(app: FastifyInstance, context: RouteConte
       context.roomStore.clearPasscodeHash(room.slug);
       context.passcodeRateLimiter.clear(room.slug);
       recordRoomActivity(context.roomStore, room.slug, context.now());
-      return { room: toRoomSummary(room, context.now()) };
+      const summary = toRoomSummary(room, context.now());
+      context.signalBus.publish(room.slug, {
+        kind: "room.settings_updated",
+        room: summary,
+      });
+      return { room: summary };
     }
 
     if (decision.kind === "rotate") {
@@ -84,6 +94,11 @@ export function registerSettingsRoutes(app: FastifyInstance, context: RouteConte
     context.passcodeRateLimiter.clear(room.slug);
     recordRoomActivity(context.roomStore, room.slug, context.now());
 
-    return { room: toRoomSummary(room, context.now()) };
+    const summary = toRoomSummary(room, context.now());
+    context.signalBus.publish(room.slug, {
+      kind: "room.settings_updated",
+      room: summary,
+    });
+    return { room: summary };
   });
 }

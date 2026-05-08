@@ -42,6 +42,10 @@ The backend is a Fastify application exposing REST endpoints and a WebSocket sig
   - per-(IP, slug) sliding-window limiter for failed passcode submissions
 - `apps/server/src/domain/reclaim-rate-limiter.ts`
   - per-(IP, slug) sliding-window limiter for failed reclaim submissions
+- `apps/server/src/domain/signal-bus.ts`
+  - in-memory fan-out for server-to-client signaling events (room.snapshot, room.settings_updated)
+- `apps/server/src/routes/signal.ts`
+  - WebSocket signaling endpoint at `WS /signal`, authenticates via `roomSlug` + `sessionId` and subscribes the socket to the Signal_Bus for the slug
 - `apps/server/src/server-support.ts`
   - route-context creation, runtime wiring, and host-secret validation
 - `apps/server/src/livekit.ts`

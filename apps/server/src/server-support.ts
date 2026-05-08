@@ -15,6 +15,10 @@ import {
 } from "./domain/reclaim-rate-limiter.js";
 import type { CleanupScheduler } from "./domain/room-cleanup.js";
 import {
+  createInMemorySignalBus,
+  type SignalBus,
+} from "./domain/signal-bus.js";
+import {
   createInMemoryRoomStore,
   type RoomStore,
   type StoredRoom,
@@ -27,6 +31,8 @@ export interface BuildAppOptions {
   passcodeVerifier?: PasscodeVerifier;
   passcodeRateLimiter?: PasscodeRateLimiter;
   reclaimRateLimiter?: ReclaimRateLimiter;
+  /** Injected signal bus override. Defaults to the in-memory implementation. */
+  signalBus?: SignalBus;
   /**
    * Interval in ms for the cleanup loop. When omitted, `0`, negative, or
    * non-finite, the cleanup loop does not start. Tests build Fastify without
@@ -50,6 +56,7 @@ export interface RouteContext {
   passcodeVerifier: PasscodeVerifier;
   passcodeRateLimiter: PasscodeRateLimiter;
   reclaimRateLimiter: ReclaimRateLimiter;
+  signalBus: SignalBus;
 }
 
 export function createRouteContext(options: BuildAppOptions = {}): RouteContext {
@@ -60,6 +67,7 @@ export function createRouteContext(options: BuildAppOptions = {}): RouteContext 
     passcodeVerifier: options.passcodeVerifier ?? createArgon2idPasscodeVerifier(),
     passcodeRateLimiter: options.passcodeRateLimiter ?? createInMemoryPasscodeRateLimiter(),
     reclaimRateLimiter: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
+    signalBus: options.signalBus ?? createInMemorySignalBus(),
   };
 }
 
