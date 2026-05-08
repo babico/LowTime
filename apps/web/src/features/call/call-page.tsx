@@ -5,6 +5,7 @@ import type { NetworkHealth } from "../../network-health.js";
 import { getNetworkHealthLabel } from "../../network-health.js";
 import type { DowngradeRung } from "../../auto-downgrade.js";
 import { getRungLabel } from "../../auto-downgrade.js";
+import type { PromptState } from "../../audio-only-prompt.js";
 import {
   callFactsStyle,
   callHeaderBadgeRowStyle,
@@ -46,9 +47,12 @@ interface CallPageProps {
   remoteVideoRef: RefObject<HTMLVideoElement | null>;
   slug: string;
   downgradeRung: DowngradeRung;
+  audioOnlyPromptState: PromptState;
   onBackToJoin: () => void;
   onLeaveCall: () => void;
   onRestoreQuality: () => void;
+  onAcceptAudioOnly: () => void;
+  onDismissAudioOnly: () => void;
   onToggleCamera: () => Promise<void>;
   onToggleMicrophone: () => Promise<void>;
 }
@@ -78,6 +82,22 @@ export function CallPage(props: CallPageProps) {
           <button type="button" onClick={props.onRestoreQuality}>
             Restore video
           </button>
+        </section>
+      ) : null}
+      {props.audioOnlyPromptState === "suggested" ? (
+        <section role="dialog" aria-labelledby="audio-only-prompt-heading">
+          <h2 id="audio-only-prompt-heading">Network still unstable</h2>
+          <p style={mutedParagraphStyle}>
+            We had to pause your video because the network kept dropping. Would you like to continue audio-only, or keep retrying video?
+          </p>
+          <div>
+            <button type="button" onClick={props.onAcceptAudioOnly} autoFocus>
+              Continue audio-only
+            </button>{" "}
+            <button type="button" onClick={props.onDismissAudioOnly}>
+              Keep trying video
+            </button>
+          </div>
         </section>
       ) : null}
       {props.callSession ? (

@@ -165,6 +165,7 @@ export interface UseAutoDowngradeInput {
 
 export interface UseAutoDowngradeState {
   rung: DowngradeRung;
+  lastTransitionAt: number;
   restore: () => void;
 }
 
@@ -181,6 +182,7 @@ export function useAutoDowngrade(input: UseAutoDowngradeInput): UseAutoDowngrade
   const intervalMs = input.intervalMs ?? DEFAULT_INTERVAL_MS;
 
   const [rung, setRung] = useState<DowngradeRung>("none");
+  const [lastTransitionAt, setLastTransitionAt] = useState<number>(now());
   const rungRef = useRef<DowngradeRung>("none");
   const lastTransitionAtRef = useRef<number>(now());
 
@@ -191,6 +193,7 @@ export function useAutoDowngrade(input: UseAutoDowngradeInput): UseAutoDowngrade
       rungRef.current = "none";
       lastTransitionAtRef.current = now();
       setRung("none");
+      setLastTransitionAt(lastTransitionAtRef.current);
       return;
     }
 
@@ -208,6 +211,7 @@ export function useAutoDowngrade(input: UseAutoDowngradeInput): UseAutoDowngrade
         rungRef.current = result.next;
         lastTransitionAtRef.current = result.lastTransitionAt;
         setRung(result.next);
+        setLastTransitionAt(result.lastTransitionAt);
       }
     };
 
@@ -286,9 +290,10 @@ export function useAutoDowngrade(input: UseAutoDowngradeInput): UseAutoDowngrade
     rungRef.current = "none";
     lastTransitionAtRef.current = now();
     setRung("none");
+    setLastTransitionAt(lastTransitionAtRef.current);
   }, [now]);
 
-  return { rung, restore };
+  return { rung, lastTransitionAt, restore };
 }
 
 export function getRungLabel(rung: DowngradeRung): string {
