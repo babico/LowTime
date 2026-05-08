@@ -3,6 +3,8 @@ import type { RefObject } from "react";
 import type { StoredCallSession } from "../../room-entry.js";
 import type { NetworkHealth } from "../../network-health.js";
 import { getNetworkHealthLabel } from "../../network-health.js";
+import type { DowngradeRung } from "../../auto-downgrade.js";
+import { getRungLabel } from "../../auto-downgrade.js";
 import {
   callFactsStyle,
   callHeaderBadgeRowStyle,
@@ -43,8 +45,10 @@ interface CallPageProps {
   remoteParticipantLabel: string;
   remoteVideoRef: RefObject<HTMLVideoElement | null>;
   slug: string;
+  downgradeRung: DowngradeRung;
   onBackToJoin: () => void;
   onLeaveCall: () => void;
+  onRestoreQuality: () => void;
   onToggleCamera: () => Promise<void>;
   onToggleMicrophone: () => Promise<void>;
 }
@@ -66,6 +70,16 @@ export function CallPage(props: CallPageProps) {
           </div>
         </div>
       </section>
+      {props.downgradeRung !== "none" ? (
+        <section role="status" aria-live="polite">
+          <p style={mutedParagraphStyle}>
+            <strong>{getRungLabel(props.downgradeRung)}</strong>
+          </p>
+          <button type="button" onClick={props.onRestoreQuality}>
+            Restore video
+          </button>
+        </section>
+      ) : null}
       {props.callSession ? (
         <section style={callLayoutStyle}>
           <section style={remoteTileStyle}>

@@ -59,7 +59,7 @@
 | Advanced media controls | `done` | Issue #17. Added a shared `AdvancedMediaPrefs` shape with six overrides (maxResolution, maxFps, maxBitrateKbps, audioPriority, receiveVideo, audioOnly), pure `computeEffectivePublishOptions` helper, Advanced Media Controls disclosure on the room page, and `StoredCallSession` round-trip of the user prefs | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Host quality cap | `done` | Issue #18. Shared `clampPresetToCap` helper in `packages/shared/src/index.ts` drives both the client preset dropdown and the server `POST /api/rooms/:slug/settings` handler; room-page now hides presets above the cap and the settings handler accepts a `qualityCap` body field | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Live room settings updates | `planned` | Access mode and quality changes during a call | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
-| Automatic low-network downgrade | `planned` | Bitrate -> resolution -> frame rate -> video pause | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Automatic low-network downgrade | `done` | Issue #20. Added a pure `computeDowngradeStep` state machine and a `useAutoDowngrade` hook that walks the bitrate → resolution → frame rate → video-paused ladder with 10s dwell hysteresis. Call page renders a "Quality reduced" chip with a Restore Video button | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Audio-only prompt flow | `planned` | Prompt after repeated instability | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | 1:1 P2P fallback after SFU failure | `planned` | 1:1 only, no group mesh fallback | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 
