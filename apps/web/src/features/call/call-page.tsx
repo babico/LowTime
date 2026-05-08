@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 
+import type { ChatMessage } from "@lowtime/shared";
 import type { StoredCallSession } from "../../room-entry.js";
 import type { NetworkHealth } from "../../network-health.js";
 import { getNetworkHealthLabel } from "../../network-health.js";
@@ -7,6 +8,7 @@ import type { DowngradeRung } from "../../auto-downgrade.js";
 import { getRungLabel } from "../../auto-downgrade.js";
 import type { PromptState } from "../../audio-only-prompt.js";
 import type { P2PCallStatus } from "./call-effects.js";
+import { ChatPanel } from "./chat-panel.js";
 import {
   callFactsStyle,
   callHeaderBadgeRowStyle,
@@ -51,6 +53,8 @@ interface CallPageProps {
   audioOnlyPromptState: PromptState;
   p2pStatus: P2PCallStatus;
   p2pError: string | null;
+  chatMessages: ChatMessage[];
+  onSendChat: (body: string) => void;
   onBackToJoin: () => void;
   onLeaveCall: () => void;
   onRestoreQuality: () => void;
@@ -209,6 +213,12 @@ export function CallPage(props: CallPageProps) {
           {props.p2pError && props.p2pStatus === "failed" ? (
             <p role="alert">{props.p2pError}</p>
           ) : null}
+          <ChatPanel
+            messages={props.chatMessages}
+            currentSessionId={props.callSession.sessionId}
+            onSend={props.onSendChat}
+            disabled={props.callStatus !== "connected" && !isP2PConnected}
+          />
         </section>
       ) : (
         <>

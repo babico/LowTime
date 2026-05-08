@@ -213,3 +213,15 @@ export interface P2PTokenResponse {
 }
 
 export type MediaTokenResponse = SfuTokenResponse | P2PTokenResponse;
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ChatSendRequest {
+  body: string;
+}

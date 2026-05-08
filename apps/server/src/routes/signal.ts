@@ -1,8 +1,12 @@
 import type { FastifyInstance } from "fastify";
+import crypto from "node:crypto";
 
 import { toRoomSummary } from "../domain/room-status.js";
 import type { RouteContext } from "../server-support.js";
 import type { SignalServerEvent } from "../domain/signal-bus.js";
+
+/** Maximum chat message body length in UTF-16 code units. */
+const CHAT_MAX_BODY_LENGTH = 500;
 
 /**
  * WebSocket signaling endpoint at `/signal`.
@@ -185,6 +189,38 @@ export function registerSignalRoutes(
               peerSend({ kind: payload.kind, payload: payload.payload });
             }
           }
+          return;
+        }
+
+        // Handle chat.send — broadcast to all room subscribers.
+        if (payload.kind === "chat.send") {
+          const body = typeof payload.body === "string" ? payload.body.trim() : "";
+          if (body.length === 0 || body.length > CHAT_MAX_BODY_LENGTH) {
+            safeSend({
+              kind: "error",
+              code: "invalid_message",
+              message: `Chat message must be 1–${CHAT_MAX_BODY_LENGTH} characters`,
+            });
+            return;
+          }
+          const room = context.roomStore.getRoom(connectedSlug);
+          if (room == null) {
+            safeSend({ kind: "error", code: "unauthorized", message: "Room not found" });
+            return;
+          }
+          const session = room.sessions.find((s) => s.id === connectedSessionId);
+          if (session == null) {
+            safeSend({ kind: "error", code: "session_expired", message: "Session expired; rejoin the room" });
+            return;
+          }
+          const message = {
+            id: `msg_${crypto.randomBytes(8).toString("hex")}`,
+            senderId: connectedSessionId,
+            senderName: session.displayName,
+            body,
+            createdAt: context.now().toISOString(),
+          };
+          context.signalBus.publish(connectedSlug, { kind: "chat.received", message });
           return;
         }
 

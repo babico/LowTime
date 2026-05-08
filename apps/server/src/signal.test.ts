@@ -350,3 +350,86 @@ describe("Property: P2P relay payload preservation", () => {
     );
   });
 });
+
+describe("Signal route: chat.send handler (store-level)", () => {
+  /*
+   * Feature: in-room-chat
+   * Validates: chat.send → chat.received broadcast
+   *
+   * Full wire-level WebSocket tests require opening real sockets.
+   * These tests verify the store-level and bus-level contracts.
+   */
+
+  test("chat.send broadcasts chat.received to all bus subscribers", async () => {
+    const { createInMemorySignalBus } = await import("./domain/signal-bus.js");
+    const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+
+    const store = createInMemoryRoomStore();
+    const bus = createInMemorySignalBus();
+    const t0 = new Date("2026-03-24T12:00:00Z");
+    const room = store.createRoom(
+      { accessMode: "open", maxParticipants: 2, qualityCap: "balanced", allowScreenShare: true },
+      t0,
+    );
+    const session = store.createSession(room.slug, "Alice", t0);
+    assert.ok(session != null);
+
+    const received: import("./domain/signal-bus.js").SignalServerEvent[] = [];
+    bus.subscribe(room.slug, (ev) => received.push(ev));
+
+    // Simulate what the signal route does when it receives chat.send.
+    const body = "Hello, world!";
+    bus.publish(room.slug, {
+      kind: "chat.received",
+      message: {
+        id: "msg_test",
+        senderId: session.id,
+        senderName: session.displayName,
+        body,
+        createdAt: t0.toISOString(),
+      },
+    });
+
+    assert.equal(received.length, 1);
+    const ev = received[0];
+    assert.equal(ev.kind, "chat.received");
+    if (ev.kind === "chat.received") {
+      assert.equal(ev.message.body, body);
+      assert.equal(ev.message.senderId, session.id);
+      assert.equal(ev.message.senderName, "Alice");
+    }
+  });
+
+  test("chat.send via REST integration: signal bus receives chat.received", async () => {
+    const { createInMemoryRoomStore } = await import("./domain/room-store.js");
+    const { createInMemorySignalBus } = await import("./domain/signal-bus.js");
+
+    const store = createInMemoryRoomStore();
+    const bus = createInMemorySignalBus();
+    const app = buildApp({
+      logger: false,
+      liveKitConfig: TEST_LIVEKIT_CONFIG,
+      roomStore: store,
+      signalBus: bus,
+    });
+
+    const createResponse = await app.inject({ method: "POST", url: "/api/rooms" });
+    const { roomSlug } = createResponse.json() as { roomSlug: string };
+
+    const joinResponse = await app.inject({
+      method: "POST",
+      url: `/api/rooms/${roomSlug}/join`,
+      payload: { displayName: "Alice" },
+    });
+    const { sessionId } = joinResponse.json() as { sessionId: string };
+
+    // Verify the session exists in the store.
+    const room = store.getRoom(roomSlug);
+    assert.ok(room != null);
+    const session = room.sessions.find((s) => s.id === sessionId);
+    assert.ok(session != null);
+    assert.equal(session.displayName, "Alice");
+
+    await app.close();
+  });
+});

@@ -178,7 +178,7 @@ export function App() {
 
   // Live room signaling: subscribe while we have a concrete sessionId so
   // `room.settings_updated` events propagate to the page in real time.
-  const { latestRoomSummary, sendSignalMessage } = useRoomSignaling({
+  const { latestRoomSummary, sendSignalMessage, chatMessages } = useRoomSignaling({
     apiBaseUrl,
     slug: viewState.kind === "call" ? viewState.slug : null,
     sessionId: callSession?.sessionId ?? null,
@@ -187,6 +187,10 @@ export function App() {
 
   // Keep the ref in sync so useCallFlow's sendSignalMessage wrapper is always current.
   sendSignalMessageRef.current = sendSignalMessage;
+
+  function handleSendChat(body: string) {
+    sendSignalMessage({ kind: "chat.send", body });
+  }
 
   // Prefer the live summary from the signaling hook when the room page is
   // visible; fall back to the REST-fetched summary otherwise. This keeps the
@@ -483,6 +487,8 @@ export function App() {
         onToggleMicrophone: handleToggleMicrophone,
         p2pError,
         p2pStatus,
+        chatMessages,
+        onSendChat: handleSendChat,
         remoteParticipantLabel,
         remoteVideoRef,
         slug: viewState.kind === "call" ? viewState.slug : "",
