@@ -11,6 +11,25 @@ interface WaitingPageProps {
   onBackToJoin: () => void;
 }
 
+/**
+ * User-facing copy for each lobby denial reason. Kept pure and exported so a
+ * unit test can lock the mapping for every reason the shared type allows.
+ */
+export function getLobbyDenialMessage(
+  reason: Extract<LobbyRequestStatusResponse, { status: "denied" }>["reason"],
+): string {
+  switch (reason) {
+    case "host_denied":
+      return "The host denied your request.";
+    case "room_expired":
+      return "This room has expired. Ask for a fresh link.";
+    case "room_closed":
+      return "This room has ended.";
+    case "lobby_timeout":
+      return "We didn't hear from the host within 10 minutes. Please ask for a fresh link.";
+  }
+}
+
 export function WaitingPage(props: WaitingPageProps) {
   return (
     <main style={callPageStyle}>
@@ -43,9 +62,7 @@ export function WaitingPage(props: WaitingPageProps) {
           <p>Approval is still pending.</p>
         ) : null}
         {props.waitingStatus?.status === "denied" ? (
-          <p role="alert">
-            Host denied this request: <strong>{props.waitingStatus.reason}</strong>
-          </p>
+          <p role="alert">{getLobbyDenialMessage(props.waitingStatus.reason)}</p>
         ) : null}
         {props.waitingError ? <p role="alert">{props.waitingError}</p> : null}
         <button type="button" onClick={props.onBackToJoin}>

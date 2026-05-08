@@ -86,3 +86,9 @@ B --> K
 - Redact secrets in logs, traces, and error reporting by default.
 - Keep dashboard ownership clear once the team grows.
 - Current implementation exposes a client-side network health badge in the call header using browser online state plus lightweight connection heuristics; deeper transport-quality metrics are still future work. The PWA shell caches only static app assets, so room state and live call state should still be treated as network-dependent.
+- The server-side cleanup loop emits structured info-level log records scoped under `event: "room_cleanup"`. Action values today:
+  - `room_idle_expired`: a room was removed because `now >= lastActivityAt + 2h`.
+  - `room_closed_reaped`: a room whose `status === "closed"` was removed after the 5-minute grace window.
+  - `lobby_request_timed_out`: a waiting lobby request older than 10 minutes transitioned to `{ status: "denied", reason: "lobby_timeout" }`.
+  - `tick_failed`: `error` level; a single cleanup tick threw; subsequent ticks continue.
+  Structured cleanup counters for dashboards are deferred to the observability roadmap.

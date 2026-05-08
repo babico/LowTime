@@ -13,13 +13,12 @@ import {
   createInMemoryReclaimRateLimiter,
   type ReclaimRateLimiter,
 } from "./domain/reclaim-rate-limiter.js";
+import type { CleanupScheduler } from "./domain/room-cleanup.js";
 import {
   createInMemoryRoomStore,
   type RoomStore,
   type StoredRoom,
 } from "./domain/room-store.js";
-
-const DEFAULT_ROOM_TTL_MS = 2 * 60 * 60 * 1000;
 
 export interface BuildAppOptions {
   now?: () => Date;
@@ -28,6 +27,14 @@ export interface BuildAppOptions {
   passcodeVerifier?: PasscodeVerifier;
   passcodeRateLimiter?: PasscodeRateLimiter;
   reclaimRateLimiter?: ReclaimRateLimiter;
+  /**
+   * Interval in ms for the cleanup loop. When omitted, `0`, negative, or
+   * non-finite, the cleanup loop does not start. Tests build Fastify without
+   * this option so they remain deterministic.
+   */
+  cleanupIntervalMs?: number;
+  /** Injected scheduler for deterministic tests. Defaults to `setInterval`. */
+  cleanupScheduler?: CleanupScheduler;
   /**
    * Overrides the Fastify logger option used by `buildApp`. Primarily used by
    * tests that capture log output into an in-memory buffer. When omitted the
@@ -54,10 +61,6 @@ export function createRouteContext(options: BuildAppOptions = {}): RouteContext 
     passcodeRateLimiter: options.passcodeRateLimiter ?? createInMemoryPasscodeRateLimiter(),
     reclaimRateLimiter: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
   };
-}
-
-export function createRoomExpiry(now: Date): string {
-  return new Date(now.getTime() + DEFAULT_ROOM_TTL_MS).toISOString();
 }
 
 export function hasValidHostSecret(room: StoredRoom, hostSecret: string | undefined): boolean {

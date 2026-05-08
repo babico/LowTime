@@ -8,9 +8,9 @@ import type {
 } from "@lowtime/shared";
 
 import { toRoomSummary, getRoomStatus } from "../domain/room-status.js";
+import { recordRoomActivity } from "../domain/room-activity.js";
 import { validateCreateRoomRequest, validateJoinRoomRequest } from "../domain/room-validation.js";
 import {
-  createRoomExpiry,
   type RouteContext,
 } from "../server-support.js";
 
@@ -32,11 +32,15 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
       const passcodeHash =
         plainPasscode != null ? await context.passcodeVerifier.hash(plainPasscode) : undefined;
 
-      const room = context.roomStore.createRoom({
-        ...storeInput,
-        expiresAt: createRoomExpiry(context.now()),
-        passcodeHash,
-      });
+      const now = context.now();
+      const room = context.roomStore.createRoom(
+        {
+          ...storeInput,
+          initialActivity: now.toISOString(),
+          passcodeHash,
+        },
+        now,
+      );
 
       const responseBody: CreateRoomResponse = {
         roomSlug: room.slug,
@@ -171,6 +175,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
       }
 
       room.status = "active";
+      recordRoomActivity(context.roomStore, room.slug, context.now());
 
       return {
         joinState: "direct",

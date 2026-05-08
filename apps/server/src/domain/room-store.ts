@@ -8,11 +8,18 @@ import type {
   TransportPreference,
 } from "@lowtime/shared";
 
+/** Two hours. Inactivity TTL applied to rooms on every activity bump. */
+export const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
+
+export type LobbyDenialReason = "host_denied" | "room_expired" | "room_closed" | "lobby_timeout";
+
 export interface StoredRoom extends RoomSummary {
   hostSecret: string;
   passcodeHash: string | null;
   sessions: StoredSession[];
   lobbyRequests: StoredLobbyRequest[];
+  lastActivityAt: string;
+  closedAt: string | null;
 }
 
 export interface CreateStoredRoomInput {
@@ -20,7 +27,11 @@ export interface CreateStoredRoomInput {
   maxParticipants: number;
   qualityCap: QualityCap;
   allowScreenShare: boolean;
-  expiresAt: string;
+  /**
+   * Seed timestamp for `lastActivityAt`. Defaults to the ambient clock passed
+   * into `createRoom`. Tests use this seam to freeze the initial expiry.
+   */
+  initialActivity?: string;
   passcodeHash?: string;
 }
 
@@ -36,32 +47,68 @@ export interface StoredLobbyRequest {
   status: "waiting" | "approved" | "denied";
   sessionId?: string;
   transportPreference?: TransportPreference;
-  denialReason?: "host_denied" | "room_expired" | "room_closed";
+  denialReason?: LobbyDenialReason;
 }
 
 export interface RoomStore {
-  createRoom(input: CreateStoredRoomInput): StoredRoom;
+  /**
+   * Creates a new room. `now` is the authoritative wall-clock used to seed
+   * `lastActivityAt` when `input.initialActivity` is omitted, and to compute
+   * the derived `expiresAt = lastActivityAt + ROOM_TTL_MS`.
+   */
+  createRoom(input: CreateStoredRoomInput, now: Date): StoredRoom;
   getRoom(slug: RoomSlug): StoredRoom | undefined;
+  /** Returns a fresh array of slugs. Safe to iterate while mutating the store. */
+  listRoomSlugs(): RoomSlug[];
+  /** Removes a room and its sub-arrays. Returns the removed record. */
+  deleteRoom(slug: RoomSlug): StoredRoom | undefined;
+  /** Updates the activity seed and the derived expiry together. */
+  setRoomActivity(
+    slug: RoomSlug,
+    lastActivityAt: string,
+    expiresAt: string,
+  ): boolean;
   setPasscodeHash(slug: RoomSlug, hash: string): boolean;
   clearPasscodeHash(slug: RoomSlug): boolean;
   createSession(roomSlug: RoomSlug, displayName: string): StoredSession | undefined;
-  createLobbyRequest(roomSlug: RoomSlug, displayName: string, createdAt: string): StoredLobbyRequest | undefined;
+  createLobbyRequest(
+    roomSlug: RoomSlug,
+    displayName: string,
+    createdAt: string,
+  ): StoredLobbyRequest | undefined;
   listLobbyRequests(roomSlug: RoomSlug): StoredLobbyRequest[];
-  getLobbyRequest(roomSlug: RoomSlug, requestId: string): StoredLobbyRequest | undefined;
-  approveLobbyRequest(roomSlug: RoomSlug, requestId: string): StoredLobbyRequest | undefined;
-  denyLobbyRequest(roomSlug: RoomSlug, requestId: string, reason: "host_denied" | "room_expired" | "room_closed"): StoredLobbyRequest | undefined;
+  getLobbyRequest(
+    roomSlug: RoomSlug,
+    requestId: string,
+  ): StoredLobbyRequest | undefined;
+  approveLobbyRequest(
+    roomSlug: RoomSlug,
+    requestId: string,
+  ): StoredLobbyRequest | undefined;
+  denyLobbyRequest(
+    roomSlug: RoomSlug,
+    requestId: string,
+    reason: LobbyDenialReason,
+  ): StoredLobbyRequest | undefined;
+}
+
+function computeExpiry(lastActivityAt: string): string {
+  return new Date(Date.parse(lastActivityAt) + ROOM_TTL_MS).toISOString();
 }
 
 export function createInMemoryRoomStore(): RoomStore {
   const rooms = new Map<RoomSlug, StoredRoom>();
 
   return {
-    createRoom(input) {
+    createRoom(input, now) {
       let slug = createSlug();
 
       while (rooms.has(slug)) {
         slug = createSlug();
       }
+
+      const lastActivityAt = input.initialActivity ?? now.toISOString();
+      const expiresAt = computeExpiry(lastActivityAt);
 
       const room: StoredRoom = {
         slug,
@@ -70,11 +117,13 @@ export function createInMemoryRoomStore(): RoomStore {
         qualityCap: input.qualityCap,
         allowScreenShare: input.allowScreenShare,
         status: "created",
-        expiresAt: input.expiresAt,
+        expiresAt,
         hostSecret: createHostSecret(),
         passcodeHash: input.passcodeHash ?? null,
         sessions: [],
         lobbyRequests: [],
+        lastActivityAt,
+        closedAt: null,
       };
 
       rooms.set(slug, room);
@@ -83,6 +132,26 @@ export function createInMemoryRoomStore(): RoomStore {
     },
     getRoom(slug) {
       return rooms.get(slug);
+    },
+    listRoomSlugs() {
+      return [...rooms.keys()];
+    },
+    deleteRoom(slug) {
+      const room = rooms.get(slug);
+      if (room == null) {
+        return undefined;
+      }
+      rooms.delete(slug);
+      return room;
+    },
+    setRoomActivity(slug, lastActivityAt, expiresAt) {
+      const room = rooms.get(slug);
+      if (room == null) {
+        return false;
+      }
+      room.lastActivityAt = lastActivityAt;
+      room.expiresAt = expiresAt;
+      return true;
     },
     setPasscodeHash(slug, hash) {
       const room = rooms.get(slug);
@@ -169,6 +238,14 @@ export function createInMemoryRoomStore(): RoomStore {
       const request = rooms.get(roomSlug)?.lobbyRequests.find((entry) => entry.id === requestId);
       if (request == null) {
         return undefined;
+      }
+
+      // Do not overwrite an existing denialReason (Requirement 10.5). The tick
+      // only reaches this call path for still-"waiting" requests, but a direct
+      // caller that bypasses the status guard would otherwise erase a valid
+      // prior reason.
+      if (request.status !== "waiting" && request.denialReason != null) {
+        return request;
       }
 
       request.status = "denied";

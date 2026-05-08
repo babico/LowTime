@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { LobbyRequestStatusResponse, LobbyRequestSummary } from "@lowtime/shared";
 
 import { getRoomStatus } from "../domain/room-status.js";
+import { recordRoomActivity } from "../domain/room-activity.js";
 import {
   hasValidHostSecret,
   type RouteContext,
@@ -112,6 +113,7 @@ export function registerLobbyRoutes(app: FastifyInstance, context: RouteContext)
       }
 
       room.status = "active";
+      recordRoomActivity(context.roomStore, room.slug, context.now());
 
       return {
         status: "approved",

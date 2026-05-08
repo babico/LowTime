@@ -49,7 +49,7 @@
 | Passcode-protected rooms | `done` | Issue #12. Added Argon2id hash storage, join-time verification, `(IP, slug)` rate limiter, host-only settings endpoint for rotation, and access-mode + passcode UI on create and join screens | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
 | Host reclaim after refresh | `done` | Issue #13. Added `POST /api/rooms/:slug/reclaim` with dedicated `(IP, slug)` rate limiter, `useHostReclaim` hook that silently validates cached host secrets on room-page mount, and a paste-a-secret form for hosts without a cached credential | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Reconnect window and session recovery | `planned` | Preserve identity during short disconnects | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
-| Room expiry and cleanup jobs | `planned` | Expire inactive rooms and trim transient state | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| Room expiry and cleanup jobs | `done` | Issue #15. Added activity-driven room expiry with a 2h inactivity timer, a 60-second cleanup loop, 10-minute lobby-request TTL with new `lobby_timeout` denial reason, and a 5-minute closed-room grace window. See `apps/server/src/domain/room-cleanup.ts` and `apps/server/src/domain/room-activity.ts` | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 
 ## Phase 3: Flexible Quality Controls
 

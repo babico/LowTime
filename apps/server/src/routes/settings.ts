@@ -5,6 +5,7 @@ import type {
 } from "@lowtime/shared";
 
 import { toRoomSummary } from "../domain/room-status.js";
+import { recordRoomActivity } from "../domain/room-activity.js";
 import { validateUpdateSettingsRequest } from "../domain/room-validation.js";
 import {
   hasValidHostSecret,
@@ -55,6 +56,7 @@ export function registerSettingsRoutes(app: FastifyInstance, context: RouteConte
       room.accessMode = decision.accessMode;
       context.roomStore.clearPasscodeHash(room.slug);
       context.passcodeRateLimiter.clear(room.slug);
+      recordRoomActivity(context.roomStore, room.slug, context.now());
       return { room: toRoomSummary(room, context.now()) };
     }
 
@@ -74,6 +76,7 @@ export function registerSettingsRoutes(app: FastifyInstance, context: RouteConte
       room.accessMode = "passcode";
     }
     context.passcodeRateLimiter.clear(room.slug);
+    recordRoomActivity(context.roomStore, room.slug, context.now());
 
     return { room: toRoomSummary(room, context.now()) };
   });

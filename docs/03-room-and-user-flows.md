@@ -106,6 +106,8 @@ Closed --> [*]
 Expired --> [*]
 ```
 
+Note: the `Expiring` sub-state is not yet surfaced in the API. The current implementation transitions directly from `"active"` (or `"created"`) to `"expired"` when the 2-hour inactivity timer elapses; there is no pre-expiry warning interval today. When a participant activity operation (direct admission, lobby approval, passcode rotation, access-mode change) hits the server, `lastActivityAt` is bumped and `expiresAt` is recomputed as `lastActivityAt + 2h`. The server-side cleanup loop runs every 60 seconds and removes rooms whose `expiresAt` has elapsed.
+
 ## Access Modes
 - `open`: Guests join directly if the room is not full and not expired.
 - `lobby`: Guests wait for host approval before token issuance.

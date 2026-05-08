@@ -67,10 +67,11 @@ H --> I[Cleanup durable and ephemeral state]
 ```
 
 ## Cleanup Jobs
-- Run a frequent sweeper to expire rooms whose inactivity timer has elapsed.
-- Remove lobby requests older than 10 minutes.
-- Delete reconnect state once the 5-minute recovery window ends.
-- Trim the chat ring buffer to a fixed maximum count while the room is live.
+- A server-side cleanup loop runs on a configurable cadence (60 seconds by default in production, controlled by `BuildAppOptions.cleanupIntervalMs`). Tests omit the option so they never start real timers.
+- **Room inactivity expiry**: every tick inspects each Stored_Room, compares `lastActivityAt + 2h` to `now`, and removes rooms whose expiry has elapsed. `POST /api/rooms`, direct admission via `POST /api/rooms/:slug/join`, lobby approval via `POST /api/rooms/:slug/lobby/:requestId/approve`, and settings updates via `POST /api/rooms/:slug/settings` all bump `lastActivityAt` via the `recordRoomActivity` helper. Reclaim calls, GET endpoints, denied joins, and invalid passcode attempts do not bump activity.
+- **Lobby request TTL**: waiting lobby requests older than 10 minutes are transitioned to `{ status: "denied", reason: "lobby_timeout" }`. The new `"lobby_timeout"` reason is distinct from `"room_expired"` so the web client can differentiate "the room itself expired" from "you sat in the lobby too long".
+- **Closed-room grace window**: rooms whose `status === "closed"` remain in the store for 5 minutes after close so the web client has a chance to render a "room unavailable" message before the slug 404s. They are reaped by the same sweeper on the next tick past the grace window. No close endpoint exists yet; the plumbing is in place for the first close code path.
+- Every cleanup action emits a structured info-level log record with `event: "room_cleanup"` and one of `action: "room_idle_expired" | "room_closed_reaped" | "lobby_request_timed_out"`. A tick-level error is caught and logged as `action: "tick_failed"`; subsequent ticks continue.
 
 ## Edge Cases
 - Redis restarts while a room is active.
@@ -86,3 +87,5 @@ H --> I[Cleanup durable and ephemeral state]
 - Rebuild missing Redis live state from PostgreSQL only when safe and strictly necessary.
 - Treat Redis as canonical for current presence, but not for long-term room existence.
 - Keep chat ephemeral by design and do not write chat history to PostgreSQL in v1.
+- `last_activity_at` and `closed_at` live only in the in-memory Room_Store today and will become durable columns with the PostgreSQL migration (Issue #32). The cleanup loop uses them to drive inactivity expiry and the closed-room grace window, respectively.
+- Reconnect-window semantics are tracked separately under Issue #14 and are not coupled to the cleanup loop in the current implementation.

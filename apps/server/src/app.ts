@@ -8,6 +8,7 @@ import { registerReclaimRoutes } from "./routes/reclaim.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { createInMemoryRoomStore, type RoomStore } from "./domain/room-store.js";
+import { startCleanupLoop } from "./domain/room-cleanup.js";
 import {
   createRouteContext,
   type BuildAppOptions,
@@ -31,6 +32,20 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   registerMediaRoutes(app, context);
   registerSettingsRoutes(app, context);
   registerReclaimRoutes(app, context);
+
+  const intervalMs = options.cleanupIntervalMs;
+  if (typeof intervalMs === "number" && Number.isFinite(intervalMs) && intervalMs > 0) {
+    const loop = startCleanupLoop({
+      store: context.roomStore,
+      intervalMs,
+      now: context.now,
+      logger: app.log,
+      scheduler: options.cleanupScheduler,
+    });
+    app.addHook("onClose", async () => {
+      loop.stop();
+    });
+  }
 
   return app;
 }
