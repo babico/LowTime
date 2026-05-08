@@ -36,12 +36,17 @@ export async function joinRoomRequest(input: {
   return (await response.json()) as JoinRoomResponse;
 }
 
-export async function startPreviewRequest(requestedMedia: RequestedMedia): Promise<MediaStream> {
+export async function startPreviewRequest(
+  requestedMedia: RequestedMedia,
+  qualityPreset?: QualityPreset,
+): Promise<MediaStream> {
   if (typeof navigator === "undefined" || navigator.mediaDevices?.getUserMedia == null) {
     throw new Error("This browser does not support live device preview.");
   }
 
-  return navigator.mediaDevices.getUserMedia(buildPreviewConstraints(requestedMedia));
+  return navigator.mediaDevices.getUserMedia(
+    buildPreviewConstraints(requestedMedia, qualityPreset),
+  );
 }
 
 export async function submitLobbyAction(input: {

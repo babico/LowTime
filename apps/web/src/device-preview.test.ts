@@ -50,3 +50,52 @@ test("getPreviewStateMessage prefers explicit errors and covers preview states",
     "Camera missing",
   );
 });
+
+
+test("buildPreviewConstraints returns data_saver profile when preset is data_saver", () => {
+  const constraints = buildPreviewConstraints({ audio: true, video: true }, "data_saver");
+  assert.ok(typeof constraints.video === "object");
+  if (typeof constraints.video === "object") {
+    const width = constraints.video.width as { ideal: number };
+    const height = constraints.video.height as { ideal: number };
+    const frameRate = constraints.video.frameRate as { ideal: number };
+    assert.equal(width.ideal, 320);
+    assert.equal(height.ideal, 240);
+    assert.equal(frameRate.ideal, 12);
+  }
+});
+
+test("buildPreviewConstraints returns balanced profile when preset is omitted (default)", () => {
+  const constraints = buildPreviewConstraints({ audio: true, video: true });
+  assert.ok(typeof constraints.video === "object");
+  if (typeof constraints.video === "object") {
+    const width = constraints.video.width as { ideal: number };
+    const height = constraints.video.height as { ideal: number };
+    const frameRate = constraints.video.frameRate as { ideal: number };
+    assert.equal(width.ideal, 640);
+    assert.equal(height.ideal, 360);
+    assert.equal(frameRate.ideal, 15);
+  }
+});
+
+test("buildPreviewConstraints returns best_quality profile when preset is best_quality", () => {
+  const constraints = buildPreviewConstraints({ audio: true, video: true }, "best_quality");
+  assert.ok(typeof constraints.video === "object");
+  if (typeof constraints.video === "object") {
+    const width = constraints.video.width as { ideal: number };
+    const height = constraints.video.height as { ideal: number };
+    const frameRate = constraints.video.frameRate as { ideal: number };
+    assert.equal(width.ideal, 1280);
+    assert.equal(height.ideal, 720);
+    assert.equal(frameRate.ideal, 24);
+  }
+});
+
+test("buildPreviewConstraints still returns video:false when video is disabled regardless of preset", () => {
+  for (const preset of ["data_saver", "balanced", "best_quality"] as const) {
+    assert.deepEqual(buildPreviewConstraints({ audio: true, video: false }, preset), {
+      audio: true,
+      video: false,
+    });
+  }
+});

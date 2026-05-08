@@ -40,6 +40,7 @@ H -->|No| J[Show rejoin failure]
 - `Best Quality`
   - Use only when network and device conditions are healthy.
   - Desktop may scale up to 720p, 24fps, 700-1500 kbps.
+- Implementation lives in [`apps/web/src/quality-presets.ts`](../apps/web/src/quality-presets.ts) and is shared by `buildPreviewConstraints` (pre-join camera preview) and `connectToSfu` (LiveKit `videoCaptureDefaults` and `publishDefaults.videoEncoding`). Update the table there when tuning the preset values.
 
 ## Advanced Controls
 - Send resolution cap

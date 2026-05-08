@@ -55,7 +55,7 @@
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| Quality presets | `planned` | Data Saver, Balanced, Best Quality | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Quality presets | `done` | Issue #16. Shared `apps/web/src/quality-presets.ts` table drives both the device-preview constraints and the LiveKit publish options for Data Saver / Balanced / Best Quality | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Advanced media controls | `planned` | Resolution, FPS, bitrate, audio priority, receive-video, audio-only | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Host quality cap | `planned` | Host can limit room max quality | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Live room settings updates | `planned` | Access mode and quality changes during a call | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
