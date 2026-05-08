@@ -59,6 +59,8 @@ H -->|No| J[Show rejoin failure]
 - `Balanced` allows `Data Saver` and `Balanced`.
 - `High` allows all presets.
 - User overrides may reduce their own quality below the room cap but may not exceed it.
+- The authoritative preset-to-cap mapping lives in [`packages/shared/src/index.ts`](../packages/shared/src/index.ts) (`clampPresetToCap(preset, cap)`). Both the web client (preset dropdown) and the server (settings endpoint validation) import this helper.
+- The host can change `qualityCap` live via `POST /api/rooms/:slug/settings` with `{ qualityCap: "low" | "balanced" | "high" }`. A cap change bumps `lastActivityAt` (same as access-mode and passcode rotations).
 
 ## Adaptation Pipeline
 ```mermaid

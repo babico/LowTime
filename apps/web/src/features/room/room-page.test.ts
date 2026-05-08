@@ -51,3 +51,12 @@ test("derivePasscodeDeniedMessage ignores unrelated denial reasons", () => {
     assert.equal(derivePasscodeDeniedMessage(result), null);
   }
 });
+
+
+import { listAllowedPresets } from "./room-page.js";
+
+test("listAllowedPresets returns the cap-specific preset list", () => {
+  assert.deepEqual(listAllowedPresets("low"), ["data_saver"]);
+  assert.deepEqual(listAllowedPresets("balanced"), ["data_saver", "balanced"]);
+  assert.deepEqual(listAllowedPresets("high"), ["data_saver", "balanced", "best_quality"]);
+});

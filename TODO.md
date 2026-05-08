@@ -57,7 +57,7 @@
 | --- | --- | --- | --- |
 | Quality presets | `done` | Issue #16. Shared `apps/web/src/quality-presets.ts` table drives both the device-preview constraints and the LiveKit publish options for Data Saver / Balanced / Best Quality | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Advanced media controls | `planned` | Resolution, FPS, bitrate, audio priority, receive-video, audio-only | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Host quality cap | `planned` | Host can limit room max quality | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Host quality cap | `done` | Issue #18. Shared `clampPresetToCap` helper in `packages/shared/src/index.ts` drives both the client preset dropdown and the server `POST /api/rooms/:slug/settings` handler; room-page now hides presets above the cap and the settings handler accepts a `qualityCap` body field | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Live room settings updates | `planned` | Access mode and quality changes during a call | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
 | Automatic low-network downgrade | `planned` | Bitrate -> resolution -> frame rate -> video pause | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Audio-only prompt flow | `planned` | Prompt after repeated instability | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
