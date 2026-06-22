@@ -91,7 +91,7 @@
 | coturn integration | `planned` | NAT traversal and relay support | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
 | Docker-based deployment packaging | `done` | Compose now defines web, server, postgres, redis, coturn, and optional LiveKit services | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
 | Metrics, logs, and dashboards | `planned` | Product, media, and abuse visibility | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
-| Abuse and rate-limit controls | `planned` | Protect room creation and join paths | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
+| Abuse and rate-limit controls | `in_progress` | Issue #37. Adds a per-IP room-create rate limiter (sliding window) and a "create-failures" counter that drops abusive clients. New pure module `apps/server/src/domain/room-create-rate-limiter.ts`; wiring in `apps/server/src/routes/rooms.ts`. Passcode and reclaim rate limiters already exist. | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
 
 ## Refactor Program
 

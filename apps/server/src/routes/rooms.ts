@@ -18,10 +18,18 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
   app.post<{ Body: CreateRoomRequest; Reply: CreateRoomResponse | { message: string } }>(
     "/api/rooms",
     async (request, reply) => {
+      const clientIp = request.ip ?? "unknown";
+
+      if (!context.roomCreateRateLimiter.shouldAllow(clientIp)) {
+        reply.code(429);
+        return { message: "Too many rooms created from this network. Try again later." };
+      }
+
       const body = request.body ?? {};
       const validation = validateCreateRoomRequest(body);
 
       if (!validation.ok) {
+        context.roomCreateRateLimiter.recordFailure(clientIp);
         reply.code(400);
         return {
           message: validation.message,
@@ -49,6 +57,8 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
         expiresAt: room.expiresAt,
         room: toRoomSummary(room, context.now()),
       };
+
+      context.roomCreateRateLimiter.recordSuccess(clientIp);
 
       if (plainPasscode != null) {
         responseBody.passcode = plainPasscode;

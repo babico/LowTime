@@ -24,6 +24,10 @@ import {
   type StoredRoom,
 } from "./domain/room-store.js";
 import type { IceServerConfig } from "@lowtime/shared";
+import {
+  createInMemoryRoomCreateRateLimiter,
+  type RoomCreateRateLimiter,
+} from "./domain/room-create-rate-limiter.js";
 
 /** Default ICE servers used when no override is provided. */
 export const DEFAULT_ICE_SERVERS: IceServerConfig[] = [
@@ -58,6 +62,15 @@ export interface BuildAppOptions {
    * default `true` is used.
    */
   logger?: FastifyServerOptions["logger"];
+  /**
+   * Sets the Fastify `trustProxy` option. Defaults to `true` so the
+   * rate limiter and other per-IP code can see the real client IP
+   * behind a reverse proxy. Tests can override to `false` to pin the
+   * IP to the loopback address.
+   */
+  trustProxy?: FastifyServerOptions["trustProxy"];
+  /** Injected per-IP room-create rate limiter. Defaults to an in-memory limiter. */
+  roomCreateRateLimiter?: RoomCreateRateLimiter;
 }
 
 export interface RouteContext {
@@ -69,6 +82,7 @@ export interface RouteContext {
   reclaimRateLimiter: ReclaimRateLimiter;
   signalBus: SignalBus;
   iceServers: IceServerConfig[];
+  roomCreateRateLimiter: RoomCreateRateLimiter;
 }
 
 export function createRouteContext(options: BuildAppOptions = {}): RouteContext {
@@ -81,6 +95,8 @@ export function createRouteContext(options: BuildAppOptions = {}): RouteContext 
     reclaimRateLimiter: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
     signalBus: options.signalBus ?? createInMemorySignalBus(),
     iceServers: options.iceServers ?? DEFAULT_ICE_SERVERS,
+    roomCreateRateLimiter:
+      options.roomCreateRateLimiter ?? createInMemoryRoomCreateRateLimiter(),
   };
 }
 
