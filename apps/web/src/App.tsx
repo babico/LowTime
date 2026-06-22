@@ -166,7 +166,6 @@ export function App() {
     p2pError,
     p2pStatus,
     remoteParticipantLabel,
-    remoteVideoRef,
     remoteVideoRefMap,
     remoteVideoTiles,
   } = useCallFlow({
