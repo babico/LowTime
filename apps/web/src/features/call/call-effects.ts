@@ -17,6 +17,7 @@ import {
   requestScreenShareToggle,
   type ScreenShareRoomLike,
 } from "../../screen-share.js";
+import { setRemoteVideoSubscription, type RemoteVideoRoomLike } from "../../remote-video-toggle.js";
 import {
   clearStoredCallSession,
   getViewState,
@@ -58,6 +59,8 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
   const [isTogglingScreenShare, setIsTogglingScreenShare] = useState<boolean>(false);
+  const [isRemoteVideoPaused, setIsRemoteVideoPaused] = useState<boolean>(false);
+  const [isTogglingRemoteVideo, setIsTogglingRemoteVideo] = useState<boolean>(false);
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const [callRoom, setCallRoom] = useState<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
@@ -112,6 +115,8 @@ export function useCallFlow(input: UseCallFlowInput) {
     setIsCameraEnabled(storedSession.requestedMedia.video);
     setIsScreenSharing(false);
     setIsTogglingScreenShare(false);
+    setIsRemoteVideoPaused(false);
+    setIsTogglingRemoteVideo(false);
   }, [input.viewState]);
 
   useEffect(() => {
@@ -386,6 +391,33 @@ export function useCallFlow(input: UseCallFlowInput) {
     setIsTogglingScreenShare(false);
   }
 
+  async function handleToggleRemoteVideo() {
+    const room = callRoomRef.current as RemoteVideoRoomLike | null;
+    const nextValue = !isRemoteVideoPaused;
+    setIsTogglingRemoteVideo(true);
+    setCallError(null);
+
+    const result = await setRemoteVideoSubscription({
+      room,
+      subscribed: !nextValue,
+      onError: (message) => setCallError(message),
+    });
+
+    if (result.ok) {
+      setIsRemoteVideoPaused(nextValue);
+      if (nextValue) {
+        setRemoteVideoTrack(null);
+      } else if (room != null) {
+        const nextRemoteParticipant = getPrimaryParticipant(
+          (room as { remoteParticipants: Map<string, unknown> }).remoteParticipants.values(),
+        );
+        setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
+      }
+    }
+
+    setIsTogglingRemoteVideo(false);
+  }
+
   /** Callback to pass to useRoomSignaling's onP2PMessage. */
   const handleP2PMessage = p2pFallback.handleP2PMessage;
 
@@ -400,13 +432,16 @@ export function useCallFlow(input: UseCallFlowInput) {
     handleP2PMessage,
     handleToggleCamera,
     handleToggleMicrophone,
+    handleToggleRemoteVideo,
     handleToggleScreenShare,
     isCameraEnabled,
     isMicEnabled,
+    isRemoteVideoPaused,
     isScreenShareSupported: isScreenShareSupported(),
     isScreenSharing,
     isTogglingCamera,
     isTogglingMic,
+    isTogglingRemoteVideo,
     isTogglingScreenShare,
     localVideoRef,
     localVideoTrack,

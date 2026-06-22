@@ -43,10 +43,12 @@ interface CallPageProps {
   hasRemoteVideo: boolean;
   isCameraEnabled: boolean;
   isMicEnabled: boolean;
+  isRemoteVideoPaused: boolean;
   isScreenShareSupported: boolean;
   isScreenSharing: boolean;
   isTogglingCamera: boolean;
   isTogglingMic: boolean;
+  isTogglingRemoteVideo: boolean;
   isTogglingScreenShare: boolean;
   localVideoRef: RefObject<HTMLVideoElement | null>;
   networkHealth: NetworkHealth;
@@ -66,6 +68,7 @@ interface CallPageProps {
   onDismissAudioOnly: () => void;
   onToggleCamera: () => Promise<void>;
   onToggleMicrophone: () => Promise<void>;
+  onToggleRemoteVideo: () => Promise<void>;
   onToggleScreenShare: () => Promise<void>;
 }
 
@@ -130,7 +133,12 @@ export function CallPage(props: CallPageProps) {
               <h2 style={tileHeadingStyle}>Remote</h2>
               <span>{props.remoteParticipantLabel}</span>
             </div>
-            {props.hasRemoteVideo ? (
+            {props.isRemoteVideoPaused ? (
+              <p style={screenShareCaptionStyle} role="status" aria-live="polite">
+                Remote video paused
+              </p>
+            ) : null}
+            {props.hasRemoteVideo && !props.isRemoteVideoPaused ? (
               <video
                 ref={props.remoteVideoRef}
                 autoPlay
@@ -141,9 +149,11 @@ export function CallPage(props: CallPageProps) {
               <div style={tilePlaceholderStyle}>
                 <strong>{props.remoteParticipantLabel}</strong>
                 <p style={mutedParagraphStyle}>
-                  {props.callStatus === "connected" || isP2PConnected
-                    ? "No remote camera is visible yet."
-                    : "Connecting the first call experience..."}
+                  {props.isRemoteVideoPaused
+                    ? "Resume remote video from the controls below."
+                    : props.callStatus === "connected" || isP2PConnected
+                      ? "No remote camera is visible yet."
+                      : "Connecting the first call experience..."}
                 </p>
               </div>
             )}
@@ -229,6 +239,18 @@ export function CallPage(props: CallPageProps) {
                     : "Share Screen"}
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => void props.onToggleRemoteVideo()}
+              disabled={controlsDisabled || props.isTogglingRemoteVideo}
+              style={secondaryControlStyle}
+            >
+              {props.isTogglingRemoteVideo
+                ? "Updating Remote Video..."
+                : props.isRemoteVideoPaused
+                  ? "Resume Video"
+                  : "Pause Video"}
+            </button>
             <button type="button" onClick={props.onLeaveCall} style={dangerControlStyle}>
               Leave Call
             </button>

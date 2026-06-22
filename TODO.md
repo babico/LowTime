@@ -70,7 +70,7 @@
 | Lightweight in-room chat | `done` | Issue #23. Added ephemeral `chat.send`/`chat.received` signaling, `ChatPanel` component on the call page, `chatMessages` state in `useRoomSignaling`, and `ChatMessage` type in shared package | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
 | Desktop screen share | `done` | Issue #24. Pure helpers `getActiveScreenShareTrack` / `pickPrimaryVideoTrack` in `apps/web/src/call-experience.ts`, feature detection and toggle in `apps/web/src/screen-share.ts`, Share Screen button in call page controls. Host-level `allowScreenShare` setting and weak-link camera-off hint deferred to separate issues. | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Device switching | `planned` | Front/back camera and mic/speaker selection where supported | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
-| Pause incoming video control | `planned` | User-level bandwidth control | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Pause incoming video control | `done` | Issue #26. Pause/Resume Video toggle on the call page. Pure `setRemoteVideoSubscription` helper in `apps/web/src/remote-video-toggle.ts` calls `LocalParticipant.setSubscribed(trackSid, false)` on every remote video publication. Audio is unaffected. The join-time `advancedPrefs.receiveVideo` flag still controls the initial subscription. | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Host remove participant | `planned` | Basic moderation control | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 
 ## Phase 5: Small-Group Beta
