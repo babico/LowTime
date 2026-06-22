@@ -10,6 +10,7 @@ import type {
 import { toRoomSummary, getRoomStatus } from "../domain/room-status.js";
 import { recordRoomActivity } from "../domain/room-activity.js";
 import { validateCreateRoomRequest, validateJoinRoomRequest } from "../domain/room-validation.js";
+import { recordEvent } from "../domain/metrics.js";
 import {
   type RouteContext,
 } from "../server-support.js";
@@ -50,6 +51,14 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
         room: toRoomSummary(room, context.now()),
       };
 
+      context.metrics.record(
+        recordEvent("room_created", {
+          accessMode: room.accessMode,
+          maxParticipants: String(room.maxParticipants),
+          hasPasscode: plainPasscode != null ? "true" : "false",
+        }),
+      );
+
       if (plainPasscode != null) {
         responseBody.passcode = plainPasscode;
       }
@@ -81,6 +90,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
 
       if (room == null) {
         reply.code(404);
+        context.metrics.record(recordEvent("join_rejected", { reason: "room_not_found" }));
         return {
           message: "Room not found",
         };
@@ -90,6 +100,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
 
       if (!validation.ok) {
         reply.code(400);
+        context.metrics.record(recordEvent("join_rejected", { reason: "validation" }));
         return {
           message: validation.message,
         };
@@ -98,6 +109,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
       const roomStatus = getRoomStatus(room, context.now());
 
       if (roomStatus === "expired" || roomStatus === "closed") {
+        context.metrics.record(recordEvent("join_rejected", { reason: "room_expired" }));
         return {
           joinState: "denied",
           reason: "room_expired",
@@ -105,6 +117,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
       }
 
       if (room.sessions.length >= room.maxParticipants) {
+        context.metrics.record(recordEvent("join_rejected", { reason: "room_full" }));
         return {
           joinState: "denied",
           reason: "room_full",
@@ -114,6 +127,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
       if (room.accessMode === "passcode") {
         const submittedPasscode = validation.value.passcode;
         if (submittedPasscode == null || submittedPasscode === "") {
+          context.metrics.record(recordEvent("join_rejected", { reason: "passcode_required" }));
           return {
             joinState: "denied",
             reason: "passcode_required",
@@ -123,6 +137,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
         const key = { clientIp: request.ip, slug: room.slug };
 
         if (!context.passcodeRateLimiter.shouldAllow(key)) {
+          context.metrics.record(recordEvent("join_rejected", { reason: "rate_limited" }));
           return {
             joinState: "denied",
             reason: "invalid_passcode",
@@ -135,6 +150,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
 
         if (!match) {
           context.passcodeRateLimiter.recordFailure(key);
+          context.metrics.record(recordEvent("passcode_failure"));
           return {
             joinState: "denied",
             reason: "invalid_passcode",
@@ -153,12 +169,16 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
         );
 
         if (lobbyRequest == null) {
+          context.metrics.record(recordEvent("join_rejected", { reason: "room_full" }));
           return {
             joinState: "denied",
             reason: "room_full",
           };
         }
 
+        context.metrics.record(
+          recordEvent("join_succeeded", { state: "waiting", accessMode: "lobby" }),
+        );
         return {
           joinState: "waiting",
           requestId: lobbyRequest.id,
@@ -168,6 +188,7 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
       const session = context.roomStore.createSession(room.slug, validation.value.displayName, context.now());
 
       if (session == null) {
+        context.metrics.record(recordEvent("join_rejected", { reason: "room_full" }));
         return {
           joinState: "denied",
           reason: "room_full",
@@ -176,6 +197,14 @@ export function registerRoomRoutes(app: FastifyInstance, context: RouteContext) 
 
       room.status = "active";
       recordRoomActivity(context.roomStore, room.slug, context.now());
+
+      context.metrics.record(
+        recordEvent("join_succeeded", {
+          state: "direct",
+          accessMode: room.accessMode,
+          maxParticipants: String(room.maxParticipants),
+        }),
+      );
 
       return {
         joinState: "direct",
