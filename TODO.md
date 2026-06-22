@@ -109,6 +109,11 @@
 | Server integration test split | `done` | Issue #61. Split route coverage into `rooms`, `lobby`, and `media` test files | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
 | Architecture docs for refactored structure | `done` | Issue #62. Updated frontend/backend architecture docs and contributor guidance to match the shipped layout | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
 
+## Followups (post-Phase 5)
+
+| Persist chosen camera and microphone | `done` | Issue #97. New pure `apps/web/src/device-choice-storage.ts` helper: saveDeviceChoice, loadDeviceChoice, clearDeviceChoice. Backed by sessionStorage under `lowtime:device-choice`. The call-page device switcher (#25) is the natural call site; the PR is scoped to the helper so it can land without waiting on the device switcher. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Host remove from room page | `done` | Issue #99. New pure `apps/web/src/features/room/use-room-moderation.ts` (buildRoomModeration) wraps the host-remove endpoint. The shared `apps/web/src/host-actions.ts` helper from #27 is vendored into this branch so the call site works without waiting on the #27 PR to land. | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+
 ## Update Rule For Every PR
 - If a feature changes status, update this file.
 - If a feature is done, verify the matching source doc still describes the shipped behavior.

@@ -22,6 +22,9 @@ test("removeParticipantRequest sends a POST to the participants/remove endpoint 
   });
 
   assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.removedSessionId, "sess_target");
+  }
   assert.equal(calls.length, 1);
   assert.equal(calls[0]!.url, "https://api.example.com/api/rooms/alpha/participants/sess_target/remove");
   const headers = calls[0]!.init.headers as Record<string, string>;
