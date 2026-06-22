@@ -50,7 +50,8 @@ interface CallPageProps {
   networkHealth: NetworkHealth;
   participants: RoomParticipant[];
   remoteParticipantLabel: string;
-  remoteVideoRef: RefObject<HTMLVideoElement | null>;
+  remoteVideoRefMap: RefObject<Map<string, HTMLVideoElement | null>>;
+  remoteVideoTiles: { id: string; label: string }[];
   slug: string;
   downgradeRung: DowngradeRung;
   audioOnlyPromptState: PromptState;
@@ -126,24 +127,67 @@ export function CallPage(props: CallPageProps) {
         <section style={callLayoutStyle}>
           <section style={remoteTileStyle}>
             <div style={tileHeaderStyle}>
-              <h2 style={tileHeadingStyle}>Remote</h2>
-              <span>{props.remoteParticipantLabel}</span>
+              <h2 style={tileHeadingStyle}>
+                {props.remoteVideoTiles.length > 1 ? "Remotes" : "Remote"}
+              </h2>
+              <span>
+                {props.remoteVideoTiles.length > 0
+                  ? `${props.remoteVideoTiles.length} ${
+                      props.remoteVideoTiles.length === 1 ? "camera" : "cameras"
+                    } • ${props.remoteParticipantLabel}`
+                  : props.remoteParticipantLabel}
+              </span>
             </div>
-            {props.hasRemoteVideo ? (
-              <video
-                ref={props.remoteVideoRef}
-                autoPlay
-                playsInline
-                style={remoteVideoStyle}
-              />
-            ) : (
+            {props.remoteVideoTiles.length === 0 ? (
               <div style={tilePlaceholderStyle}>
                 <strong>{props.remoteParticipantLabel}</strong>
                 <p style={mutedParagraphStyle}>
                   {props.callStatus === "connected" || isP2PConnected
-                    ? "No remote camera is visible yet."
+                    ? props.callParticipants > 1
+                      ? "Other participants have not turned their cameras on yet."
+                      : "No remote camera is visible yet."
                     : "Connecting the first call experience..."}
                 </p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    props.remoteVideoTiles.length === 1
+                      ? "1fr"
+                      : props.remoteVideoTiles.length === 2
+                        ? "repeat(2, 1fr)"
+                        : "repeat(auto-fit, minmax(12rem, 1fr))",
+                  gap: "0.5rem",
+                  width: "100%",
+                }}
+              >
+                {props.remoteVideoTiles.map((tile) => (
+                  <figure
+                    key={tile.id}
+                    style={{
+                      margin: 0,
+                      display: "grid",
+                      gap: "0.25rem",
+                    }}
+                  >
+                    <video
+                      ref={(element) => {
+                        const map = props.remoteVideoRefMap.current;
+                        if (element == null) {
+                          map.delete(tile.id);
+                        } else {
+                          map.set(tile.id, element);
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      style={remoteVideoStyle}
+                    />
+                    <figcaption style={mutedParagraphStyle}>{tile.label}</figcaption>
+                  </figure>
+                ))}
               </div>
             )}
           </section>

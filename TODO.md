@@ -69,16 +69,16 @@
 | --- | --- | --- | --- |
 | Lightweight in-room chat | `done` | Issue #23. Added ephemeral `chat.send`/`chat.received` signaling, `ChatPanel` component on the call page, `chatMessages` state in `useRoomSignaling`, and `ChatMessage` type in shared package | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
 | Desktop screen share | `planned` | Hide on unsupported browsers | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Device switching | `done` | Issue #25. Camera and microphone dropdowns on the call page. Pure helpers in `apps/web/src/device-switcher.ts` (`listMediaDevices`, `filterDeviceList`, `switchActiveDevice`). Speaker output selection deferred (browser API support too narrow). | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Device switching | `planned` | Front/back camera and mic/speaker selection where supported | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Pause incoming video control | `planned` | User-level bandwidth control | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Host remove participant | `done` | Issue #27. Server endpoint `POST /api/rooms/:slug/participants/:sessionId/remove` (host secret) deletes the target session and broadcasts a `participant_removed` signal event. Pure domain helper `apps/server/src/domain/remove-participant.ts`. Web host UI on the call page shows a per-participant Remove button. Removed participants see `The host removed you from this call.` in `callError` and the room is disconnected. | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+| Host remove participant | `planned` | Basic moderation control | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 
 ## Phase 5: Small-Group Beta
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| Raise room size to 4 participants | `done` | Issue #28. Default `maxParticipants` is now 4. Validation cap stays at 4. The create-room flow, examples in `docs/05-api-and-realtime-contracts.md`, and Phase 5 row in `docs/12-roadmap-and-release-phases.md` all reflect the new default. Beta label remains until metrics are healthy. | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
-| Group participant layout | `planned` | Responsive layout beyond 1:1 | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Raise room size to 4 participants | `planned` | Beta label remains until metrics are healthy | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
+| Group participant layout | `done` | Issue #29. The call page now renders one tile per remote participant in a CSS grid that scales from 1:1 to 4-participant rooms. Pure helpers `getAllVideoParticipants` and `getParticipantVideoTrack` in `apps/web/src/call-experience.ts`; `RemoteVideoTile` array drives the new layout in `call-effects.ts`. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | SFU subscription tuning for groups | `planned` | Prioritize visible tiles and lower background cost | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Group beta validation metrics | `planned` | Use KPI thresholds before broad rollout | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
 
@@ -108,11 +108,6 @@
 | Server room-store domain split | `done` | Issue #60. In-memory store and lobby/session mutations moved into `domain/room-store.ts` | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
 | Server integration test split | `done` | Issue #61. Split route coverage into `rooms`, `lobby`, and `media` test files | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
 | Architecture docs for refactored structure | `done` | Issue #62. Updated frontend/backend architecture docs and contributor guidance to match the shipped layout | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
-
-## Followups (post-Phase 5)
-
-| Persist chosen camera and microphone | `done` | Issue #97. New pure `apps/web/src/device-choice-storage.ts` helper: saveDeviceChoice, loadDeviceChoice, clearDeviceChoice. Backed by sessionStorage under `lowtime:device-choice`. The call-page device switcher (#25) is the natural call site; the PR is scoped to the helper so it can land without waiting on the device switcher. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
-| Host remove from room page | `done` | Issue #99. New pure `apps/web/src/features/room/use-room-moderation.ts` (buildRoomModeration) wraps the host-remove endpoint. The shared `apps/web/src/host-actions.ts` helper from #27 is vendored into this branch so the call site works without waiting on the #27 PR to land. | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 
 ## Update Rule For Every PR
 - If a feature changes status, update this file.

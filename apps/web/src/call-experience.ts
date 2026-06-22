@@ -3,8 +3,9 @@ export interface VideoTrackLike {
   isMuted?: boolean;
   /**
    * LiveKit track source identifier (`"camera"`, `"screen_share"`, …).
-   * Optional so non-LiveKit test mocks can omit it; production code always
-   * populates it via the `trackPublished` / `localTrackPublished` event payload.
+   * Optional so non-LiveKit test mocks can omit it; production code
+   * populates it via the `trackPublished` / `localTrackPublished`
+   * event payload.
    */
   source?: string;
   attach(element: HTMLMediaElement): HTMLMediaElement;
@@ -63,57 +64,6 @@ export function getFirstVideoTrack(participant: ParticipantLike | null): VideoTr
   return null;
 }
 
-const SCREEN_SHARE_SOURCES = new Set([
-  "screen_share",
-  "screenShare",
-  "screen-share",
-  "screen_video",
-]);
-
-/**
- * Returns the local participant's active screen share video track, or
- * `null` when no screen share is published. Mirrors `getFirstVideoTrack`
- * but filters on the track source so camera and screen share stay
- * distinguishable in the call UI.
- */
-export function getActiveScreenShareTrack(participant: ParticipantLike | null): VideoTrackLike | null {
-  if (participant == null) {
-    return null;
-  }
-
-  for (const publication of participant.trackPublications.values()) {
-    const track = publication.track;
-
-    if (track == null) {
-      continue;
-    }
-
-    if (track.kind !== "video" || track.isMuted === true) {
-      continue;
-    }
-
-    if (track.source != null && SCREEN_SHARE_SOURCES.has(track.source)) {
-      return track;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Returns the track the self-tile should render: the active screen share
- * when present (and not muted), otherwise the camera, otherwise `null`.
- */
-export function pickPrimaryVideoTrack(participant: ParticipantLike | null): VideoTrackLike | null {
-  const screenShare = getActiveScreenShareTrack(participant);
-
-  if (screenShare != null) {
-    return screenShare;
-  }
-
-  return getFirstVideoTrack(participant);
-}
-
 function isParticipantLike(value: unknown): value is ParticipantLike {
   if (typeof value !== "object" || value == null) {
     return false;
@@ -121,4 +71,63 @@ function isParticipantLike(value: unknown): value is ParticipantLike {
 
   const candidate = value as Partial<ParticipantLike>;
   return typeof candidate.identity === "string" && candidate.trackPublications instanceof Map;
+}
+
+/**
+ * Returns every participant in the iterable that publishes at least one
+ * attached (non-muted) video track. Audio-only and muted-video
+ * participants are dropped. Order is preserved.
+ *
+ * Used by the call page to render one tile per remote participant in
+ * group rooms (Issue #29).
+ */
+export function getAllVideoParticipants(
+  participants: Iterable<unknown>,
+): ParticipantLike[] {
+  const result: ParticipantLike[] = [];
+
+  for (const candidate of participants) {
+    if (!isParticipantLike(candidate)) {
+      continue;
+    }
+
+    const hasVideo = Array.from(candidate.trackPublications.values()).some((publication) => {
+      const track = publication.track;
+      return track != null && track.kind === "video" && track.isMuted !== true;
+    });
+
+    if (hasVideo) {
+      result.push(candidate);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Returns the first attached track on a participant whose `source`
+ * matches the requested value, or `null` when no matching track is
+ * published or the only matching track is muted.
+ */
+export function getParticipantVideoTrack(
+  participant: ParticipantLike | null,
+  source: string,
+): VideoTrackLike | null {
+  if (participant == null) {
+    return null;
+  }
+
+  for (const publication of participant.trackPublications.values()) {
+    const track = publication.track;
+
+    if (track == null || track.kind !== "video" || track.isMuted === true) {
+      continue;
+    }
+
+    if (track.source === source) {
+      return track;
+    }
+  }
+
+  return null;
 }
