@@ -64,7 +64,10 @@ test("setRemoteVideoSubscription unsubscribes every remote video track when paus
     audioSids: ["A_1"],
   });
 
-  const result = await setRemoteVideoSubscription({ room, subscribed: false });
+  const result = await setRemoteVideoSubscription({
+    room: room as unknown as RemoteVideoRoomLike,
+    subscribed: false,
+  });
 
   assert.equal(result.ok, true);
   assert.equal(result.changedTracks, 2);
