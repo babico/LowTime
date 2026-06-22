@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import type { MediaTokenResponse } from "@lowtime/shared";
 
 import {
+  getAllVideoParticipants,
   getFirstVideoTrack,
   getParticipant,
   getParticipantLabel,
-  getPrimaryParticipant,
+  type ParticipantLike,
   type VideoTrackLike,
 } from "../../call-experience.js";
 import { connectToSfu } from "../../media-controller.js";
@@ -24,6 +25,30 @@ const DEFAULT_REQUESTED_MEDIA = {
   audio: true,
   video: true,
 } as const;
+
+export interface RemoteVideoTile {
+  id: string;
+  label: string;
+  track: VideoTrackLike;
+}
+
+function buildRemoteTiles(participants: ParticipantLike[]): RemoteVideoTile[] {
+  const tiles: RemoteVideoTile[] = [];
+
+  for (const participant of participants) {
+    const track = getFirstVideoTrack(participant);
+    if (track == null) {
+      continue;
+    }
+    tiles.push({
+      id: participant.identity,
+      label: getParticipantLabel(participant, "Remote"),
+      track,
+    });
+  }
+
+  return tiles;
+}
 
 interface UseCallFlowInput {
   apiBaseUrl: string;
@@ -46,7 +71,7 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [isTogglingMic, setIsTogglingMic] = useState(false);
   const [isTogglingCamera, setIsTogglingCamera] = useState(false);
   const [localVideoTrack, setLocalVideoTrack] = useState<VideoTrackLike | null>(null);
-  const [remoteVideoTrack, setRemoteVideoTrack] = useState<VideoTrackLike | null>(null);
+  const [remoteVideoTiles, setRemoteVideoTiles] = useState<RemoteVideoTile[]>([]);
   const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
@@ -54,6 +79,7 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [callRoom, setCallRoom] = useState<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRefMap = useRef<Map<string, HTMLVideoElement | null>>(new Map());
 
   const slug = input.viewState.kind === "call" ? input.viewState.slug : "";
   const sessionId = callSession?.sessionId ?? "";
@@ -79,7 +105,7 @@ export function useCallFlow(input: UseCallFlowInput) {
       setIsTogglingMic(false);
       setIsTogglingCamera(false);
       setLocalVideoTrack(null);
-      setRemoteVideoTrack(null);
+      setRemoteVideoTiles([]);
       setRemoteParticipantLabel("Waiting for someone to join");
       setLocalStream(null);
       callRoomRef.current?.disconnect();
@@ -119,19 +145,23 @@ export function useCallFlow(input: UseCallFlowInput) {
   }, [localVideoTrack]);
 
   useEffect(() => {
-    const videoElement = remoteVideoRef.current;
+    const attached: Array<{ track: VideoTrackLike; element: HTMLVideoElement }> = [];
 
-    if (videoElement == null || remoteVideoTrack == null) {
-      return;
+    for (const tile of remoteVideoTiles) {
+      const element = remoteVideoRefMap.current.get(tile.id);
+      if (element == null) {
+        continue;
+      }
+      tile.track.attach(element);
+      attached.push({ track: tile.track, element });
     }
 
-    const attachedTrack = remoteVideoTrack;
-    attachedTrack.attach(videoElement);
-
     return () => {
-      attachedTrack.detach(videoElement);
+      for (const entry of attached) {
+        entry.track.detach(entry.element);
+      }
     };
-  }, [remoteVideoTrack]);
+  }, [remoteVideoTiles]);
 
   useEffect(() => {
     if (input.viewState.kind !== "call" || callSession == null) {
@@ -231,18 +261,20 @@ export function useCallFlow(input: UseCallFlowInput) {
         }
 
         const syncCallPresentation = () => {
-          const nextRemoteParticipant = getPrimaryParticipant(room.remoteParticipants.values());
-          const nextLocalParticipant = getParticipant(room.localParticipant);
+          const remoteParticipants = Array.from(room.remoteParticipants.values()) as ParticipantLike[];
+          const remoteVideoList = getAllVideoParticipants(remoteParticipants);
+          const nextRemoteParticipant = remoteVideoList[0] ?? null;
+          const nextLocalParticipant = getParticipant(room.localParticipant) as ParticipantLike | null;
 
           setCallParticipants(room.remoteParticipants.size + 1);
           setLocalVideoTrack(getFirstVideoTrack(nextLocalParticipant));
-          setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
+          setRemoteVideoTiles(buildRemoteTiles(remoteVideoList));
           setRemoteParticipantLabel(getParticipantLabel(nextRemoteParticipant, "Waiting for someone to join"));
         };
 
         const handleDisconnected = () => {
           setCallStatus("idle");
-          setRemoteVideoTrack(null);
+          setRemoteVideoTiles([]);
           setLocalVideoTrack(null);
           setRemoteParticipantLabel("Waiting for someone to join");
         };
@@ -374,7 +406,8 @@ export function useCallFlow(input: UseCallFlowInput) {
     p2pStatus: p2pFallback.p2pStatus,
     remoteParticipantLabel,
     remoteVideoRef,
-    remoteVideoTrack,
+    remoteVideoRefMap,
+    remoteVideoTiles,
   };
 }
 
