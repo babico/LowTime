@@ -4,7 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerLobbyRoutes } from "./routes/lobby.js";
 import { registerMediaRoutes } from "./routes/media.js";
-import { registerMetricsRoutes } from "./routes/metrics.js";
+import { registerPrometheusMetricsRoute } from "./routes/metrics-prometheus.js";
 import { registerReclaimRoutes } from "./routes/reclaim.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
@@ -19,7 +19,6 @@ import {
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: options.logger ?? true,
-    trustProxy: options.trustProxy ?? true,
   });
 
   const context = createRouteContext(options);
@@ -36,7 +35,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   registerSettingsRoutes(app, context);
   registerReclaimRoutes(app, context);
   registerSignalRoutes(app, context);
-  registerMetricsRoutes(app, context);
+  registerPrometheusMetricsRoute(app, context);
 
   const intervalMs = options.cleanupIntervalMs;
   if (typeof intervalMs === "number" && Number.isFinite(intervalMs) && intervalMs > 0) {
