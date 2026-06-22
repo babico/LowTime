@@ -7,9 +7,16 @@ import {
   getParticipant,
   getParticipantLabel,
   getPrimaryParticipant,
+  pickPrimaryVideoTrack,
   type VideoTrackLike,
 } from "../../call-experience.js";
 import { connectToSfu } from "../../media-controller.js";
+import {
+  hasActiveScreenShare,
+  isScreenShareSupported,
+  requestScreenShareToggle,
+  type ScreenShareRoomLike,
+} from "../../screen-share.js";
 import {
   clearStoredCallSession,
   getViewState,
@@ -49,6 +56,8 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<VideoTrackLike | null>(null);
   const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
+  const [isTogglingScreenShare, setIsTogglingScreenShare] = useState<boolean>(false);
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const [callRoom, setCallRoom] = useState<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
@@ -101,6 +110,8 @@ export function useCallFlow(input: UseCallFlowInput) {
     setCallError(null);
     setIsMicEnabled(storedSession.requestedMedia.audio);
     setIsCameraEnabled(storedSession.requestedMedia.video);
+    setIsScreenSharing(false);
+    setIsTogglingScreenShare(false);
   }, [input.viewState]);
 
   useEffect(() => {
@@ -235,9 +246,15 @@ export function useCallFlow(input: UseCallFlowInput) {
           const nextLocalParticipant = getParticipant(room.localParticipant);
 
           setCallParticipants(room.remoteParticipants.size + 1);
-          setLocalVideoTrack(getFirstVideoTrack(nextLocalParticipant));
+          setLocalVideoTrack(pickPrimaryVideoTrack(nextLocalParticipant));
           setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
           setRemoteParticipantLabel(getParticipantLabel(nextRemoteParticipant, "Waiting for someone to join"));
+
+          const activeScreenShare = hasActiveScreenShare(nextLocalParticipant);
+
+          if (activeScreenShare !== isScreenSharing) {
+            setIsScreenSharing(activeScreenShare);
+          }
         };
 
         const handleDisconnected = () => {
@@ -342,12 +359,31 @@ export function useCallFlow(input: UseCallFlowInput) {
       await room.localParticipant.setCameraEnabled(nextValue);
       setIsCameraEnabled(nextValue);
       const nextLocalParticipant = getParticipant(room.localParticipant);
-      setLocalVideoTrack(nextValue ? getFirstVideoTrack(nextLocalParticipant) : null);
+      setLocalVideoTrack(pickPrimaryVideoTrack(nextLocalParticipant));
     } catch (error) {
       setCallError(error instanceof Error ? error.message : "Unable to update camera state");
     } finally {
       setIsTogglingCamera(false);
     }
+  }
+
+  async function handleToggleScreenShare() {
+    const room = callRoomRef.current as ScreenShareRoomLike | null;
+    const nextValue = !isScreenSharing;
+    setIsTogglingScreenShare(true);
+    setCallError(null);
+
+    const result = await requestScreenShareToggle({
+      room,
+      nextValue,
+      onError: (message) => setCallError(message),
+    });
+
+    if (result.ok) {
+      setIsScreenSharing(nextValue);
+    }
+
+    setIsTogglingScreenShare(false);
   }
 
   /** Callback to pass to useRoomSignaling's onP2PMessage. */
@@ -364,10 +400,14 @@ export function useCallFlow(input: UseCallFlowInput) {
     handleP2PMessage,
     handleToggleCamera,
     handleToggleMicrophone,
+    handleToggleScreenShare,
     isCameraEnabled,
     isMicEnabled,
+    isScreenShareSupported: isScreenShareSupported(),
+    isScreenSharing,
     isTogglingCamera,
     isTogglingMic,
+    isTogglingScreenShare,
     localVideoRef,
     localVideoTrack,
     p2pError: p2pFallback.p2pError,
