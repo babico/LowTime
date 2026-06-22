@@ -10,7 +10,6 @@ COPY packages/shared/ packages/shared/
 COPY apps/web/ apps/web/
 COPY eslint.config.mjs ./
 
-RUN npm --workspace @lowtime/shared run build
 RUN npm --workspace @lowtime/web run build
 
 FROM nginx:1.27-alpine AS serve

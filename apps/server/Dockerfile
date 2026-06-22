@@ -10,7 +10,6 @@ COPY packages/shared/ packages/shared/
 COPY apps/server/ apps/server/
 COPY eslint.config.mjs ./
 
-RUN npm --workspace @lowtime/shared run build
 RUN npm --workspace @lowtime/server run build
 
 FROM node:22-bookworm-slim AS serve
@@ -18,8 +17,7 @@ WORKDIR /repo
 ENV NODE_ENV=production
 
 COPY --from=build /repo/package.json /repo/package-lock.json ./
-COPY --from=build /repo/packages/shared/package.json packages/shared/
-COPY --from=build /repo/packages/shared/dist packages/shared/dist
+COPY --from=build /repo/packages/shared packages/shared/
 COPY --from=build /repo/apps/server/package.json apps/server/
 COPY --from=build /repo/apps/server/dist apps/server/dist
 
