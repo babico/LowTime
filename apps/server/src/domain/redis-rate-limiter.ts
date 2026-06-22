@@ -120,7 +120,7 @@ function clipCooldownMs(value: number | undefined): number {
     : DEFAULT_COOLDOWN_MS;
 }
 
-export interface RedisPasscodeRateLimiterOptions extends RedisLimiterOptionsBase {}
+export type RedisPasscodeRateLimiterOptions = RedisLimiterOptionsBase;
 
 export function createRedisPasscodeRateLimiter(
   options: RedisPasscodeRateLimiterOptions,
@@ -190,7 +190,7 @@ export function createRedisPasscodeRateLimiter(
   };
 }
 
-export interface RedisReclaimRateLimiterOptions extends RedisLimiterOptionsBase {}
+export type RedisReclaimRateLimiterOptions = RedisLimiterOptionsBase;
 
 export function createRedisReclaimRateLimiter(
   options: RedisReclaimRateLimiterOptions,
@@ -201,10 +201,6 @@ export function createRedisReclaimRateLimiter(
   const threshold = clipThreshold(options.threshold);
   const cooldownMs = clipCooldownMs(options.cooldownMs);
   const now = options.now ?? (() => Date.now());
-
-  function keyFor(clientIp: string): string {
-    return buildKey(prefix, clientIp);
-  }
 
   return {
     async shouldAllow(clientIp: string) {
@@ -247,7 +243,7 @@ export function createRedisReclaimRateLimiter(
   };
 }
 
-export interface RedisRoomCreateRateLimiterOptions extends RedisLimiterOptionsBase {}
+export type RedisRoomCreateRateLimiterOptions = RedisLimiterOptionsBase;
 
 export function createRedisRoomCreateRateLimiter(
   options: RedisRoomCreateRateLimiterOptions,
