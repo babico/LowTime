@@ -24,5 +24,5 @@ COPY --from=build /repo/apps/server/dist apps/server/dist
 RUN npm ci --omit=dev --no-audit --no-fund --workspaces --include-workspace-root
 
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/api/health >/dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/health >/dev/null || exit 1
 CMD ["npm", "--workspace", "@lowtime/server", "start"]
