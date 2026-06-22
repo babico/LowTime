@@ -30,7 +30,7 @@ Request body:
 {
   "accessMode": "passcode",
   "passcode": "blue-falcon-42",
-  "maxParticipants": 2,
+  "maxParticipants": 4,
   "qualityCap": "balanced",
   "allowScreenShare": true
 }
@@ -47,7 +47,7 @@ Response body:
   "room": {
     "slug": "7Qn2kP9Zx4Lm",
     "accessMode": "passcode",
-    "maxParticipants": 2,
+    "maxParticipants": 4,
     "qualityCap": "balanced",
     "allowScreenShare": true,
     "status": "created",
@@ -67,7 +67,7 @@ Response body:
 {
   "slug": "7Qn2kP9Zx4Lm",
   "accessMode": "open",
-  "maxParticipants": 2,
+  "maxParticipants": 4,
   "qualityCap": "balanced",
   "allowScreenShare": true,
   "status": "created",
@@ -276,7 +276,7 @@ Response body (200):
   "room": {
     "slug": "7Qn2kP9Zx4Lm",
     "accessMode": "lobby",
-    "maxParticipants": 2,
+    "maxParticipants": 4,
     "qualityCap": "balanced",
     "allowScreenShare": true,
     "status": "active",
@@ -325,7 +325,7 @@ Response body:
   "room": {
     "slug": "7Qn2kP9Zx4Lm",
     "accessMode": "passcode",
-    "maxParticipants": 2,
+    "maxParticipants": 4,
     "qualityCap": "balanced",
     "allowScreenShare": true,
     "status": "created",

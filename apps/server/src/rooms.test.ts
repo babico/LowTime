@@ -25,7 +25,7 @@ test("POST /api/rooms creates a room with defaults and host secret", async () =>
   assert.deepEqual(payload.room, {
     slug: payload.roomSlug,
     accessMode: "open",
-    maxParticipants: 2,
+    maxParticipants: 4,
     qualityCap: "balanced",
     allowScreenShare: true,
     status: "created",

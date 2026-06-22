@@ -77,7 +77,7 @@
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| Raise room size to 4 participants | `planned` | Beta label remains until metrics are healthy | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
+| Raise room size to 4 participants | `done` | Issue #28. Default `maxParticipants` is now 4. Validation cap stays at 4. The create-room flow, examples in `docs/05-api-and-realtime-contracts.md`, and Phase 5 row in `docs/12-roadmap-and-release-phases.md` all reflect the new default. Beta label remains until metrics are healthy. | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
 | Group participant layout | `planned` | Responsive layout beyond 1:1 | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | SFU subscription tuning for groups | `planned` | Prioritize visible tiles and lower background cost | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Group beta validation metrics | `planned` | Use KPI thresholds before broad rollout | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
