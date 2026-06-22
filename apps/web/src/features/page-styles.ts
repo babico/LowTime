@@ -126,6 +126,20 @@ export const controlsPanelStyle = {
   gap: "0.75rem",
 } as const;
 
+export const participantListStyle = {
+  listStyle: "none",
+  padding: 0,
+  margin: 0,
+  display: "grid",
+  gap: "0.25rem",
+} as const;
+
+export const participantListItemStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "0.5rem",
+} as const;
+
 export const tileHeaderStyle = {
   display: "flex",
   justifyContent: "space-between",
