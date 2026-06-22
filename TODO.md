@@ -86,7 +86,7 @@
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| PostgreSQL room metadata | `planned` | Durable room state and audit events | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| PostgreSQL room metadata | `in_progress` | Durable room state and audit events. Slice 1: client + migration shipped (PR #106). | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 | Redis live room state | `planned` | Presence, lobby, reconnect, rate limits, chat buffer | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 | coturn integration | `planned` | NAT traversal and relay support | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
 | Docker-based deployment packaging | `done` | Compose now defines web, server, postgres, redis, coturn, and optional LiveKit services | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
