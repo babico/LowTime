@@ -24,6 +24,7 @@ import {
   networkBadgeStyle,
   remoteTileStyle,
   remoteVideoStyle,
+  screenShareCaptionStyle,
   secondaryControlStyle,
   selfPlaceholderStyle,
   selfViewPanelStyle,
@@ -42,8 +43,11 @@ interface CallPageProps {
   hasRemoteVideo: boolean;
   isCameraEnabled: boolean;
   isMicEnabled: boolean;
+  isScreenShareSupported: boolean;
+  isScreenSharing: boolean;
   isTogglingCamera: boolean;
   isTogglingMic: boolean;
+  isTogglingScreenShare: boolean;
   localVideoRef: RefObject<HTMLVideoElement | null>;
   networkHealth: NetworkHealth;
   remoteParticipantLabel: string;
@@ -62,6 +66,7 @@ interface CallPageProps {
   onDismissAudioOnly: () => void;
   onToggleCamera: () => Promise<void>;
   onToggleMicrophone: () => Promise<void>;
+  onToggleScreenShare: () => Promise<void>;
 }
 
 export function CallPage(props: CallPageProps) {
@@ -148,6 +153,11 @@ export function CallPage(props: CallPageProps) {
               <h2 style={tileHeadingStyle}>You</h2>
               <span>{props.callSession.displayName}</span>
             </div>
+            {props.isScreenSharing ? (
+              <p style={screenShareCaptionStyle} role="status" aria-live="polite">
+                Sharing your screen
+              </p>
+            ) : null}
             {props.hasLocalVideo && props.isCameraEnabled ? (
               <video
                 ref={props.localVideoRef}
@@ -205,6 +215,20 @@ export function CallPage(props: CallPageProps) {
             >
               {props.isTogglingCamera ? "Updating Camera..." : props.isCameraEnabled ? "Turn Camera Off" : "Turn Camera On"}
             </button>
+            {props.isScreenShareSupported ? (
+              <button
+                type="button"
+                onClick={() => void props.onToggleScreenShare()}
+                disabled={controlsDisabled || props.isTogglingScreenShare}
+                style={secondaryControlStyle}
+              >
+                {props.isTogglingScreenShare
+                  ? "Updating Screen Share..."
+                  : props.isScreenSharing
+                    ? "Stop Sharing"
+                    : "Share Screen"}
+              </button>
+            ) : null}
             <button type="button" onClick={props.onLeaveCall} style={dangerControlStyle}>
               Leave Call
             </button>

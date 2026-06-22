@@ -120,6 +120,17 @@ export const selfViewPanelStyle = {
   gap: "1rem",
 } as const;
 
+export const screenShareCaptionStyle = {
+  background: "#0f172a",
+  color: "#7dd3fc",
+  borderRadius: "0.5rem",
+  padding: "0.25rem 0.5rem",
+  fontSize: "0.75rem",
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  margin: 0,
+} as const;
+
 export const controlsPanelStyle = {
   display: "flex",
   flexWrap: "wrap",

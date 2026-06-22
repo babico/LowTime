@@ -3,7 +3,7 @@
 - Purpose: Track implementation progress feature by feature and provide one living checklist that must be updated whenever work lands.
 - Audience: Engineers, reviewers, and release owners.
 - Status: Active
-- Last Updated: 2026-03-25
+- Last Updated: 2026-06-22
 - Related Docs: [README](README.md), [Docs Map](docs/00-docs-map.md), [Roadmap And Release Phases](docs/12-roadmap-and-release-phases.md), [Testing And QA](docs/11-testing-and-qa.md)
 
 ## How To Use This File
@@ -68,7 +68,7 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | Lightweight in-room chat | `done` | Issue #23. Added ephemeral `chat.send`/`chat.received` signaling, `ChatPanel` component on the call page, `chatMessages` state in `useRoomSignaling`, and `ChatMessage` type in shared package | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
-| Desktop screen share | `planned` | Hide on unsupported browsers | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Desktop screen share | `done` | Issue #24. Pure helpers `getActiveScreenShareTrack` / `pickPrimaryVideoTrack` in `apps/web/src/call-experience.ts`, feature detection and toggle in `apps/web/src/screen-share.ts`, Share Screen button in call page controls. Host-level `allowScreenShare` setting and weak-link camera-off hint deferred to separate issues. | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Device switching | `planned` | Front/back camera and mic/speaker selection where supported | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Pause incoming video control | `planned` | User-level bandwidth control | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Host remove participant | `planned` | Basic moderation control | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
