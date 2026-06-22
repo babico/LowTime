@@ -24,6 +24,10 @@ import {
   type StoredRoom,
 } from "./domain/room-store.js";
 import type { IceServerConfig } from "@lowtime/shared";
+import {
+  createInMemoryMetrics,
+  type MetricsRegistry,
+} from "./domain/metrics.js";
 
 /** Default ICE servers used when no override is provided. */
 export const DEFAULT_ICE_SERVERS: IceServerConfig[] = [
@@ -58,6 +62,8 @@ export interface BuildAppOptions {
    * default `true` is used.
    */
   logger?: FastifyServerOptions["logger"];
+  /** Injected metrics registry. Defaults to a fresh in-process registry. */
+  metrics?: MetricsRegistry;
 }
 
 export interface RouteContext {
@@ -69,6 +75,7 @@ export interface RouteContext {
   reclaimRateLimiter: ReclaimRateLimiter;
   signalBus: SignalBus;
   iceServers: IceServerConfig[];
+  metrics: MetricsRegistry;
 }
 
 export function createRouteContext(options: BuildAppOptions = {}): RouteContext {
@@ -81,6 +88,7 @@ export function createRouteContext(options: BuildAppOptions = {}): RouteContext 
     reclaimRateLimiter: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
     signalBus: options.signalBus ?? createInMemorySignalBus(),
     iceServers: options.iceServers ?? DEFAULT_ICE_SERVERS,
+    metrics: options.metrics ?? createInMemoryMetrics(),
   };
 }
 
