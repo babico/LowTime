@@ -142,7 +142,7 @@ Current implementation boundary:
 - Keep contract types in a shared package consumed by the client.
 - Build the media controller as a dedicated subsystem rather than mixing it into UI components.
 - Treat PWA support as shell enhancement, not as offline call support.
-- Current implementation supports room creation, display-name join on `/r/:slug`, a join-side device preview with media toggles and quality preset selection, a `/r/:slug/waiting/:requestId` polling flow for lobby rooms, host-side pending-request controls on the room page, and a basic `/r/:slug/call` route with local self-view, remote tile area, mute/camera/leave controls, a lightweight network health badge, and an installable PWA shell with manifest, service-worker registration, and landing-page install prompt behavior on top of LiveKit.
+- Current implementation supports room creation, display-name join on `/r/:slug`, a join-side device preview with media toggles and quality preset selection, a `/r/:slug/waiting/:requestId` polling flow for lobby rooms, host-side pending-request controls on the room page, and a basic `/r/:slug/call` route with local self-view, remote tile area, mute/camera/leave controls, a lightweight network health badge, and an installable PWA shell with manifest, service-worker registration, and landing-page install prompt behavior on top of LiveKit. The call page also exposes camera and microphone selection dropdowns backed by `apps/web/src/device-switcher.ts`; speaker output selection is intentionally deferred.
 - The current refactor direction is feature-slice oriented on the frontend:
   - page UI stays under `features/<area>/`
   - route-specific effects live beside the page they support

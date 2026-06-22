@@ -3,7 +3,7 @@
 - Purpose: Track implementation progress feature by feature and provide one living checklist that must be updated whenever work lands.
 - Audience: Engineers, reviewers, and release owners.
 - Status: Active
-- Last Updated: 2026-06-22
+- Last Updated: 2026-03-25
 - Related Docs: [README](README.md), [Docs Map](docs/00-docs-map.md), [Roadmap And Release Phases](docs/12-roadmap-and-release-phases.md), [Testing And QA](docs/11-testing-and-qa.md)
 
 ## How To Use This File
@@ -68,8 +68,8 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | Lightweight in-room chat | `done` | Issue #23. Added ephemeral `chat.send`/`chat.received` signaling, `ChatPanel` component on the call page, `chatMessages` state in `useRoomSignaling`, and `ChatMessage` type in shared package | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
-| Desktop screen share | `done` | Issue #24. Pure helpers `getActiveScreenShareTrack` / `pickPrimaryVideoTrack` in `apps/web/src/call-experience.ts`, feature detection and toggle in `apps/web/src/screen-share.ts`, Share Screen button in call page controls. Host-level `allowScreenShare` setting and weak-link camera-off hint deferred to separate issues. | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Device switching | `planned` | Front/back camera and mic/speaker selection where supported | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Desktop screen share | `planned` | Hide on unsupported browsers | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Device switching | `done` | Issue #25. Camera and microphone dropdowns on the call page. Pure helpers in `apps/web/src/device-switcher.ts` (`listMediaDevices`, `filterDeviceList`, `switchActiveDevice`). Speaker output selection deferred (browser API support too narrow). | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Pause incoming video control | `planned` | User-level bandwidth control | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Host remove participant | `planned` | Basic moderation control | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 
@@ -87,7 +87,7 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | PostgreSQL room metadata | `planned` | Durable room state and audit events | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
-| Redis live room state | `in_progress` | Presence, lobby, reconnect, rate limits, chat buffer. Issue #33 slice 1: rate limiters shipped in this PR (see Followups). | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| Redis live room state | `planned` | Presence, lobby, reconnect, rate limits, chat buffer | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
 | coturn integration | `planned` | NAT traversal and relay support | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
 | Docker-based deployment packaging | `done` | Compose now defines web, server, postgres, redis, coturn, and optional LiveKit services | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
 | Metrics, logs, and dashboards | `planned` | Product, media, and abuse visibility | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
@@ -98,7 +98,7 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | Web route-level page extraction | `done` | Issue #52. Extracted route-level pages and reduced `App.tsx` size materially | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
-| Web styles extraction from `App.tsx` | `done` | Issue #53. App.tsx already routed to `features/page-styles.ts`; this round also moved the local chat-panel styles into `features/call/chat-panel.styles.ts`. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Web styles extraction from `App.tsx` | `planned` | Issue #53. Shared page styles already moved once; deeper style-module cleanup is still open | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Room and waiting feature-module split | `done` | Issue #54. Room and waiting effects/actions live in feature modules | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Call feature-module split | `done` | Issue #55. Call connection and media sync moved into `features/call/call-effects.ts` | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Preview and install feature-module split | `done` | Issue #56. Install and preview behavior moved into dedicated feature hooks | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { MediaTokenResponse } from "@lowtime/shared";
 
@@ -7,16 +7,16 @@ import {
   getParticipant,
   getParticipantLabel,
   getPrimaryParticipant,
-  pickPrimaryVideoTrack,
   type VideoTrackLike,
 } from "../../call-experience.js";
 import { connectToSfu } from "../../media-controller.js";
 import {
-  hasActiveScreenShare,
-  isScreenShareSupported,
-  requestScreenShareToggle,
-  type ScreenShareRoomLike,
-} from "../../screen-share.js";
+  filterDeviceList,
+  listMediaDevices,
+  switchActiveDevice,
+  type DeviceSwitchRoomLike,
+  type MediaDeviceEntry,
+} from "../../device-switcher.js";
 import {
   clearStoredCallSession,
   getViewState,
@@ -56,8 +56,11 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<VideoTrackLike | null>(null);
   const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
-  const [isTogglingScreenShare, setIsTogglingScreenShare] = useState<boolean>(false);
+  const [cameras, setCameras] = useState<MediaDeviceEntry[]>([]);
+  const [microphones, setMicrophones] = useState<MediaDeviceEntry[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [selectedMicrophoneId, setSelectedMicrophoneId] = useState<string | null>(null);
+  const [isSwitchingDevice, setIsSwitchingDevice] = useState<boolean>(false);
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const [callRoom, setCallRoom] = useState<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
@@ -110,8 +113,6 @@ export function useCallFlow(input: UseCallFlowInput) {
     setCallError(null);
     setIsMicEnabled(storedSession.requestedMedia.audio);
     setIsCameraEnabled(storedSession.requestedMedia.video);
-    setIsScreenSharing(false);
-    setIsTogglingScreenShare(false);
   }, [input.viewState]);
 
   useEffect(() => {
@@ -246,15 +247,9 @@ export function useCallFlow(input: UseCallFlowInput) {
           const nextLocalParticipant = getParticipant(room.localParticipant);
 
           setCallParticipants(room.remoteParticipants.size + 1);
-          setLocalVideoTrack(pickPrimaryVideoTrack(nextLocalParticipant));
+          setLocalVideoTrack(getFirstVideoTrack(nextLocalParticipant));
           setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
           setRemoteParticipantLabel(getParticipantLabel(nextRemoteParticipant, "Waiting for someone to join"));
-
-          const activeScreenShare = hasActiveScreenShare(nextLocalParticipant);
-
-          if (activeScreenShare !== isScreenSharing) {
-            setIsScreenSharing(activeScreenShare);
-          }
         };
 
         const handleDisconnected = () => {
@@ -311,6 +306,69 @@ export function useCallFlow(input: UseCallFlowInput) {
     };
   }, [input.apiBaseUrl, callSession, input.viewState]);
 
+  const refreshDevices = useCallback(async () => {
+    if (typeof navigator === "undefined" || navigator.mediaDevices?.enumerateDevices == null) {
+      return;
+    }
+
+    try {
+      const raw = await navigator.mediaDevices.enumerateDevices();
+      const { cameras: rawCameras, microphones: rawMicrophones } = listMediaDevices(raw);
+      const filteredCameras = filterDeviceList(rawCameras);
+      const filteredMicrophones = filterDeviceList(rawMicrophones);
+      setCameras(filteredCameras);
+      setMicrophones(filteredMicrophones);
+    } catch {
+      // enumerateDevices can reject on some hardened browsers; leave the
+      // previous device list in place rather than tearing down the UI.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (input.viewState.kind !== "call" || callSession == null) {
+      return;
+    }
+
+    void refreshDevices();
+
+    const mediaDevices = navigator.mediaDevices;
+    const handleChange = () => {
+      void refreshDevices();
+    };
+
+    mediaDevices?.addEventListener?.("devicechange", handleChange);
+
+    return () => {
+      mediaDevices?.removeEventListener?.("devicechange", handleChange);
+    };
+  }, [input.viewState, callSession, refreshDevices]);
+
+  async function handleSwitchDevice(kind: "videoinput" | "audioinput", deviceId: string) {
+    if (callRoomRef.current == null) {
+      return;
+    }
+
+    setIsSwitchingDevice(true);
+    setCallError(null);
+
+    const result = await switchActiveDevice({
+      room: callRoomRef.current as unknown as DeviceSwitchRoomLike,
+      kind,
+      deviceId,
+      onError: (message) => setCallError(message),
+    });
+
+    if (result.ok) {
+      if (kind === "videoinput") {
+        setSelectedCameraId(deviceId);
+      } else {
+        setSelectedMicrophoneId(deviceId);
+      }
+    }
+
+    setIsSwitchingDevice(false);
+  }
+
   function handleLeaveCall() {
     if (input.viewState.kind !== "call") {
       return;
@@ -359,31 +417,12 @@ export function useCallFlow(input: UseCallFlowInput) {
       await room.localParticipant.setCameraEnabled(nextValue);
       setIsCameraEnabled(nextValue);
       const nextLocalParticipant = getParticipant(room.localParticipant);
-      setLocalVideoTrack(pickPrimaryVideoTrack(nextLocalParticipant));
+      setLocalVideoTrack(nextValue ? getFirstVideoTrack(nextLocalParticipant) : null);
     } catch (error) {
       setCallError(error instanceof Error ? error.message : "Unable to update camera state");
     } finally {
       setIsTogglingCamera(false);
     }
-  }
-
-  async function handleToggleScreenShare() {
-    const room = callRoomRef.current as ScreenShareRoomLike | null;
-    const nextValue = !isScreenSharing;
-    setIsTogglingScreenShare(true);
-    setCallError(null);
-
-    const result = await requestScreenShareToggle({
-      room,
-      nextValue,
-      onError: (message) => setCallError(message),
-    });
-
-    if (result.ok) {
-      setIsScreenSharing(nextValue);
-    }
-
-    setIsTogglingScreenShare(false);
   }
 
   /** Callback to pass to useRoomSignaling's onP2PMessage. */
@@ -395,26 +434,28 @@ export function useCallFlow(input: UseCallFlowInput) {
     callRoom,
     callSession,
     callStatus,
+    cameras,
     connectedSfuUrl,
     handleLeaveCall,
     handleP2PMessage,
+    handleSwitchDevice,
     handleToggleCamera,
     handleToggleMicrophone,
-    handleToggleScreenShare,
     isCameraEnabled,
     isMicEnabled,
-    isScreenShareSupported: isScreenShareSupported(),
-    isScreenSharing,
+    isSwitchingDevice,
     isTogglingCamera,
     isTogglingMic,
-    isTogglingScreenShare,
     localVideoRef,
     localVideoTrack,
+    microphones,
     p2pError: p2pFallback.p2pError,
     p2pStatus: p2pFallback.p2pStatus,
     remoteParticipantLabel,
     remoteVideoRef,
     remoteVideoTrack,
+    selectedCameraId,
+    selectedMicrophoneId,
   };
 }
 

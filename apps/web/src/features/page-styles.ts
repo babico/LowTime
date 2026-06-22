@@ -120,35 +120,24 @@ export const selfViewPanelStyle = {
   gap: "1rem",
 } as const;
 
-export const screenShareCaptionStyle = {
-  background: "#0f172a",
-  color: "#7dd3fc",
-  borderRadius: "0.5rem",
-  padding: "0.25rem 0.5rem",
+export const deviceSelectRowStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "0.75rem",
+  alignItems: "flex-end",
+} as const;
+
+export const deviceSelectStyle = {
+  display: "grid",
+  gap: "0.25rem",
   fontSize: "0.75rem",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  margin: 0,
+  color: "#0f172a",
 } as const;
 
 export const controlsPanelStyle = {
   display: "flex",
   flexWrap: "wrap",
   gap: "0.75rem",
-} as const;
-
-export const participantListStyle = {
-  listStyle: "none",
-  padding: 0,
-  margin: 0,
-  display: "grid",
-  gap: "0.25rem",
-} as const;
-
-export const participantListItemStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "0.5rem",
 } as const;
 
 export const tileHeaderStyle = {
