@@ -71,7 +71,7 @@
 | Desktop screen share | `planned` | Hide on unsupported browsers | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Device switching | `done` | Issue #25. Camera and microphone dropdowns on the call page. Pure helpers in `apps/web/src/device-switcher.ts` (`listMediaDevices`, `filterDeviceList`, `switchActiveDevice`). Speaker output selection deferred (browser API support too narrow). | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Pause incoming video control | `planned` | User-level bandwidth control | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Host remove participant | `planned` | Basic moderation control | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+| Host remove participant | `done` | Issue #27. Server endpoint `POST /api/rooms/:slug/participants/:sessionId/remove` (host secret) deletes the target session and broadcasts a `participant_removed` signal event. Pure domain helper `apps/server/src/domain/remove-participant.ts`. Web host UI on the call page shows a per-participant Remove button. Removed participants see `The host removed you from this call.` in `callError` and the room is disconnected. | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 
 ## Phase 5: Small-Group Beta
 

@@ -204,6 +204,7 @@ The event tables below enumerate the full planned signaling surface. Everything 
 | `network.poor` | network tier and recommendation | Drive low-network UX |
 | `transport.switch_available` | next transport | Offer P2P fallback in 1:1 rooms |
 | `room.expired` | none | Force return to expired-room UI |
+| `participant_removed` | session id and reason | Inform every socket the host removed a session |
 
 ## Shared Types
 - `RoomSummary`
@@ -214,6 +215,10 @@ The event tables below enumerate the full planned signaling surface. Everything 
   - `allowScreenShare`
   - `status`
   - `expiresAt`
+  - `participants?: RoomParticipant[]` (id + displayName per admitted session)
+- `RoomParticipant`
+  - `id`
+  - `displayName`
 - `ParticipantSummary`
   - `id`
   - `displayName`

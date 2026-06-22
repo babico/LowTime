@@ -26,6 +26,12 @@ export interface RoomSummary {
   allowScreenShare: boolean;
   status: RoomStatus;
   expiresAt: string;
+  participants?: RoomParticipant[];
+}
+
+export interface RoomParticipant {
+  id: string;
+  displayName: string;
 }
 
 export interface RequestedMedia {

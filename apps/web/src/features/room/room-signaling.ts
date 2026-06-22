@@ -10,6 +10,7 @@ export type SignalServerEvent =
   | { kind: "room.settings_updated"; room: RoomSummary }
   | { kind: "transport.switch_available"; nextTransport: "p2p" }
   | { kind: "chat.received"; message: ChatMessage }
+  | { kind: "participant_removed"; sessionId: string; reason: "host_removed" }
   | { kind: "p2p.offer"; payload: { sdp: string } }
   | { kind: "p2p.answer"; payload: { sdp: string } }
   | { kind: "p2p.ice"; payload: RTCIceCandidateInit }
@@ -35,6 +36,8 @@ export interface UseRoomSignalingState {
   sessionExpired: boolean;
   /** True when the server has indicated P2P fallback is available for this room. */
   p2pAvailable: boolean;
+  /** True when the server has indicated the host removed this session. */
+  removedFromRoom: boolean;
   /** Ordered list of chat messages received since the socket connected. */
   chatMessages: ChatMessage[];
   /** Send a raw message frame to the server. No-op if socket is not open. */
@@ -73,6 +76,7 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
   const [latestRoomSummary, setLatestRoomSummary] = useState<RoomSummary | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [p2pAvailable, setP2pAvailable] = useState(false);
+  const [removedFromRoom, setRemovedFromRoom] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -153,6 +157,11 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
           // Server acknowledged our ping; session is still alive. No state change needed.
         } else if (raw.kind === "transport.switch_available") {
           setP2pAvailable(true);
+        } else if (raw.kind === "participant_removed") {
+          const ev = raw as { kind: "participant_removed"; sessionId: string };
+          if (ev.sessionId === sessionId) {
+            setRemovedFromRoom(true);
+          }
         } else if (raw.kind === "chat.received") {
           const msg = (raw as { kind: string; message: ChatMessage }).message;
           setChatMessages((prev) => [...prev, msg]);
@@ -193,5 +202,5 @@ export function useRoomSignaling(input: UseRoomSignalingInput): UseRoomSignaling
     };
   }, [apiBaseUrl, slug, sessionId]);
 
-  return { signalState, latestRoomSummary, sessionExpired, p2pAvailable, chatMessages, sendSignalMessage };
+  return { signalState, latestRoomSummary, sessionExpired, p2pAvailable, removedFromRoom, chatMessages, sendSignalMessage };
 }
