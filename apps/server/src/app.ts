@@ -19,6 +19,7 @@ import {
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: options.logger ?? true,
+    trustProxy: options.trustProxy ?? true,
   });
 
   const context = createRouteContext(options);
