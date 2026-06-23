@@ -117,9 +117,6 @@ export function createPgPool(config: PgConfig, overrides: PoolConfig = {}): PgPo
           return client.query(text, params as never[]);
         },
         release: () => client.release(),
-        async end() {
-          await client.end();
-        },
       } as PgClient & { release: () => void };
     },
     async end() {
