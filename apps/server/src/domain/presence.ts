@@ -108,10 +108,6 @@ function buildIndexMember(key: PresenceKey): string {
   return key;
 }
 
-function parseIndexMember(member: string): PresenceKey {
-  return member;
-}
-
 export function createRedisPresence(options: RedisPresenceOptions): Presence {
   const redis = options.redis;
   const prefix = options.keyPrefix;
@@ -180,10 +176,4 @@ export function createRedisPresence(options: RedisPresenceOptions): Presence {
       return expiredKeys.map((entry) => entry.member as PresenceKey);
     },
   };
-}
-
-function scoreFor(_key: string): number {
-  // Marker to satisfy the unused warning while keeping the
-  // public function free of leaky Redis API surface.
-  return 0;
 }
