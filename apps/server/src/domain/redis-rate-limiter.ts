@@ -206,35 +206,38 @@ export function createRedisReclaimRateLimiter(
   const now = options.now ?? (() => Date.now());
 
   return {
-    async shouldAllow(clientIp: string) {
+    async shouldAllow(key: RateLimitKey) {
       const at = now();
-      const cooldown = await readCooldown(redis, buildCooldownKey(prefix, clientIp));
+      const ip = internalKeyFromKey(key);
+      const cooldown = await readCooldown(redis, buildCooldownKey(prefix, ip));
       if (cooldown != null && at < cooldown) {
         return false;
       }
       if (cooldown != null) {
-        await redis.del(buildCooldownKey(prefix, clientIp));
+        await redis.del(buildCooldownKey(prefix, ip));
       }
-      await pruneAndCount(redis, buildFailuresKey(prefix, clientIp), at, windowMs);
+      await pruneAndCount(redis, buildFailuresKey(prefix, ip), at, windowMs);
       return true;
     },
-    async recordFailure(clientIp: string) {
+    async recordFailure(key: RateLimitKey) {
       const at = now();
-      await pruneAndCount(redis, buildFailuresKey(prefix, clientIp), at, windowMs);
+      const ip = internalKeyFromKey(key);
+      await pruneAndCount(redis, buildFailuresKey(prefix, ip), at, windowMs);
       await redis.zadd(
-        buildFailuresKey(prefix, clientIp),
+        buildFailuresKey(prefix, ip),
         at,
         `${at}-${Math.random().toString(36).slice(2, 10)}`,
       );
-      const count = await redis.zcard(buildFailuresKey(prefix, clientIp));
+      const count = await redis.zcard(buildFailuresKey(prefix, ip));
       if (Number(count) >= threshold) {
-        await redis.set(buildCooldownKey(prefix, clientIp), String(at + cooldownMs), "PX", cooldownMs);
+        await redis.set(buildCooldownKey(prefix, ip), String(at + cooldownMs), "PX", cooldownMs);
       }
     },
-    async recordSuccess(clientIp: string) {
+    async recordSuccess(key: RateLimitKey) {
+      const ip = internalKeyFromKey(key);
       await Promise.all([
-        redis.del(buildFailuresKey(prefix, clientIp)),
-        redis.del(buildCooldownKey(prefix, clientIp)),
+        redis.del(buildFailuresKey(prefix, ip)),
+        redis.del(buildCooldownKey(prefix, ip)),
       ]);
     },
     async clearAll() {
