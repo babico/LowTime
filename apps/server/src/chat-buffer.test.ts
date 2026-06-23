@@ -11,10 +11,6 @@ import {
   type RedisLike,
 } from "./domain/chat-buffer.js";
 
-function now(offsetMs: number = 0): Date {
-  return new Date(Date.UTC(2026, 5, 22, 12, 0, 0, offsetMs));
-}
-
 function entry(text: string, offsetMs: number, senderId = "sess_1"): ChatEntry {
   return {
     id: `m_${offsetMs}_${text}`,
@@ -23,6 +19,7 @@ function entry(text: string, offsetMs: number, senderId = "sess_1"): ChatEntry {
     senderName: "Alice",
     body: text,
     sentAt: new Date(Date.UTC(2026, 5, 22, 12, 0, 0, offsetMs)).toISOString(),
+    _baseMs: Date.UTC(2026, 5, 22, 12, 0, 0, offsetMs),
   };
 }
 
