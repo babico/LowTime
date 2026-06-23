@@ -27,7 +27,7 @@ export interface PgClient {
     params?: unknown[],
   ): Promise<QueryResult<R>>;
   end(): Promise<void>;
-  release?(): void;
+  release: () => void;
 }
 
 export interface PgPool {
@@ -122,8 +122,8 @@ export function createPgPool(config: PgConfig, overrides: PoolConfig = {}): PgPo
   };
 }
 
-export async function closePgClient(_client: PgClient): Promise<void> {
-  void _client;
+export async function closePgClient(client: PgClient): Promise<void> {
+  void client;
 }
 
 /**
