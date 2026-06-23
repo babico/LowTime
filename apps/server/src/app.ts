@@ -9,6 +9,7 @@ import { registerReclaimRoutes } from "./routes/reclaim.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerSignalRoutes } from "./routes/signal.js";
+import { registerMetricsRoutes } from "./routes/metrics.js";
 import { createInMemoryRoomStore, type RoomStore } from "./domain/room-store.js";
 import { startCleanupLoop } from "./domain/room-cleanup.js";
 import {
@@ -19,6 +20,7 @@ import {
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: options.logger ?? true,
+    trustProxy: options.trustProxy ?? true,
   });
 
   const context = createRouteContext(options);
@@ -36,6 +38,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   registerReclaimRoutes(app, context);
   registerSignalRoutes(app, context);
   registerPrometheusMetricsRoute(app, context);
+  registerMetricsRoutes(app, context);
 
   const intervalMs = options.cleanupIntervalMs;
   if (typeof intervalMs === "number" && Number.isFinite(intervalMs) && intervalMs > 0) {

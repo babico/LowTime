@@ -3,7 +3,7 @@ import type { MetricsSnapshot } from "./metrics.js";
 /**
  * Render a `MetricsSnapshot` as a Prometheus exposition body
  * (text/plain; version 0.0.4). Pure so it can be tested without a
- * live registry. No new dependency — the format is small and
+ * live registry. No new dependency ÔÇö the format is small and
  * stable.
  *
  * Conventions:
@@ -12,7 +12,7 @@ import type { MetricsSnapshot } from "./metrics.js";
  *   - Label pairs are alphabetized in the output.
  *   - Unlabelled counters come last in a group.
  *   - Label values are escaped per the Prometheus text format:
- *     backslash → `\\`, double quote → `\"`, newline → `\n`.
+ *     backslash ÔåÆ `\\`, double quote ÔåÆ `\"`, newline ÔåÆ `\n`.
  *   - A single meta counter `lowtime_metrics_emitted_at_seconds`
  *     exposes the snapshot timestamp so a scraper can detect a
  *     silent registry.

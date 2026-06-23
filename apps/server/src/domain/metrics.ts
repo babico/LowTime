@@ -1,7 +1,7 @@
 /**
  * In-process metrics registry for LowTime (Issue #31).
  *
- * Counters only — enough to back the group-beta validation KPIs in
+ * Counters only ÔÇö enough to back the group-beta validation KPIs in
  * `docs/10-observability-and-operations.md`. Prometheus export and
  * OpenTelemetry traces are tracked as separate follow-up issues.
  *

@@ -9,7 +9,6 @@ import type {
 import { getRoomStatus } from "../domain/room-status.js";
 import type { StoredRoom } from "../domain/room-store.js";
 import { validateMediaTokenRequest } from "../domain/room-validation.js";
-import { recordEvent } from "../domain/metrics.js";
 import { issueSfuToken } from "../livekit.js";
 import {
   type RouteContext,
@@ -85,17 +84,11 @@ export function registerMediaRoutes(app: FastifyInstance, context: RouteContext)
       // P2P transport branch.
       if (validation.value.transportPreference === "p2p") {
         if (room.maxParticipants !== 2) {
-          context.metrics.record(
-            recordEvent("join_rejected", { reason: "p2p_group_room" }),
-          );
           reply.code(400);
           return {
             message: "P2P transport is only available for 1:1 rooms",
           };
         }
-        context.metrics.record(
-          recordEvent("p2p_fallback_triggered", { maxParticipants: "2" }),
-        );
         return issueP2PToken({
           room,
           sessionId: session.id,
