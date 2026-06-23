@@ -122,12 +122,13 @@ describe("createRedisReclaimRateLimiter", () => {
       cooldownMs: 10_000,
     });
 
-    await limiter.recordFailure("203.0.113.1");
-    await limiter.recordFailure("203.0.113.1");
-    assert.equal(await limiter.shouldAllow("203.0.113.1"), false);
+    const key = { clientIp: "203.0.113.1", slug: "alpha" };
+    await limiter.recordFailure(key);
+    await limiter.recordFailure(key);
+    assert.equal(await limiter.shouldAllow(key), false);
 
-    await limiter.recordSuccess("203.0.113.1");
-    assert.equal(await limiter.shouldAllow("203.0.113.1"), true);
+    await limiter.recordSuccess(key);
+    assert.equal(await limiter.shouldAllow(key), true);
   });
 });
 
