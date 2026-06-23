@@ -147,6 +147,13 @@ export const tileHeaderStyle = {
   gap: "1rem",
 } as const;
 
+export const screenShareCaptionStyle = {
+  margin: 0,
+  fontSize: "0.875rem",
+  color: "#475569",
+  fontStyle: "italic",
+} as const;
+
 export const tileHeadingStyle = {
   margin: 0,
 } as const;
