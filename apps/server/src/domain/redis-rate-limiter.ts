@@ -95,10 +95,10 @@ async function readCooldown(redis: RedisLike, cooldownKey: string): Promise<numb
 
 async function listKeysForPrefix(redis: RedisLike, pattern: string): Promise<string[]> {
   const out: string[] = [];
-  let cursor = "0";
+  let cursor: string | number = "0";
   for (;;) {
     const [next, batch] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 200);
-    cursor = next;
+    cursor = typeof next === "number" ? String(next) : next;
     if (batch.length > 0) {
       out.push(...batch);
     }
