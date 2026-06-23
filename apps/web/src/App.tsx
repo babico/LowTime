@@ -191,8 +191,8 @@ export function App() {
     p2pError,
     p2pStatus,
     remoteParticipantLabel,
-    remoteVideoRef,
-    remoteVideoTrack,
+    remoteVideoRefMap,
+    remoteVideoTiles,
   } = useCallFlow({
     apiBaseUrl,
     setViewState,
@@ -493,7 +493,7 @@ export function App() {
         connectedSfuUrl,
         downgradeRung,
         hasLocalVideo: localVideoTrack != null,
-        hasRemoteVideo: remoteVideoTrack != null,
+        hasRemoteVideo: remoteVideoTiles.length > 0,
         isCameraEnabled,
         isHost,
         isMicEnabled,
@@ -515,7 +515,8 @@ export function App() {
         chatMessages,
         onSendChat: handleSendChat,
         remoteParticipantLabel,
-        remoteVideoRef,
+        remoteVideoRefMap,
+        remoteVideoTiles: remoteVideoTiles.map((tile) => ({ id: tile.id, label: tile.label })),
         slug: viewState.kind === "call" ? viewState.slug : "",
       }}
       homePageProps={{
