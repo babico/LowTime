@@ -30,7 +30,6 @@ function clipWindow(value: number | undefined): number {
 
 export function createInMemoryReconnectState(options: ReconnectStateOptions = {}): ReconnectState {
   const windowMs = clipWindow(options.windowMs);
-  const now = options.now ?? (() => Date.now());
   const buckets = new Map<string, number>();
 
   return {
@@ -89,7 +88,6 @@ export function createRedisReconnectState(options: RedisReconnectStateOptions): 
   const redis = options.redis;
   const prefix = options.keyPrefix;
   const windowMs = clipWindow(options.windowMs);
-  const now = options.now ?? (() => Date.now());
 
   return {
     async markDisconnected(sessionId, at) {
