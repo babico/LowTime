@@ -30,8 +30,9 @@ function makeRedis(): RedisLike {
 }
 
 async function redisIsReachable(): Promise<boolean> {
+  let redis: IORedisType | null = null;
   try {
-    const redis = new IORedis({
+    redis = new IORedis({
       host: REDIS_HOST,
       port: REDIS_PORT,
       password: REDIS_PASSWORD,
@@ -39,11 +40,28 @@ async function redisIsReachable(): Promise<boolean> {
       maxRetriesPerRequest: 1,
       connectTimeout: 1500,
     });
-    await redis.connect();
-    const result = (await redis.ping()) as string;
+    await Promise.race([
+      redis.connect(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("redisIsReachable: timeout")), 2000),
+      ),
+    ]);
+    const result = (await Promise.race([
+      redis.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("redisIsReachable: ping timeout")), 2000),
+      ),
+    ])) as string;
     await redis.quit();
     return result === "PONG";
   } catch {
+    if (redis) {
+      try {
+        redis.disconnect();
+      } catch {
+        // ignore
+      }
+    }
     return false;
   }
 }
