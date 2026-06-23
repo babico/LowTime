@@ -1,4 +1,4 @@
-import pg, { type Client, type ClientConfig, type Pool, type PoolConfig, type QueryResult, type QueryResultRow } from "pg";
+import pg, { type Client, type ClientConfig, type PoolConfig, type QueryResult, type QueryResultRow } from "pg";
 
 /**
  * PostgreSQL client + pool wrappers for LowTime (Issue #32, slice 1).
