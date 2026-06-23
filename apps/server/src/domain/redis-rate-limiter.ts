@@ -2,7 +2,14 @@ import type { RoomSlug } from "@lowtime/shared";
 
 import type { PasscodeRateLimiter, RateLimitKey } from "./passcode-rate-limiter.js";
 import type { ReclaimRateLimiter } from "./reclaim-rate-limiter.js";
-import type { RoomCreateRateLimiter } from "./room-create-rate-limiter.js";
+
+export interface RoomCreateRateLimiter {
+  shouldAllow(clientIp: string): Promise<boolean>;
+  recordFailure(clientIp: string): Promise<void>;
+  recordSuccess(clientIp: string): Promise<void>;
+  clearAll(): Promise<void>;
+  getState(clientIp: string): Promise<{ failuresInWindow: number; cooldownUntil: number | null }>;
+}
 
 /**
  * Redis-backed rate limiter implementations (Issue #33, slice 1).
@@ -31,7 +38,7 @@ export interface RedisLike {
   del(...keys: string[]): Promise<number>;
   get(key: string): Promise<string | null>;
   set(key: string, value: string, mode: string, duration: number): Promise<unknown>;
-  scan(cursor: string | number, ...args: string[]): Promise<[string, string[]]>;
+  scan(cursor: string | number, ...args: string[]): Promise<[string | number, string[]]>;
 }
 
 export interface RedisLimiterOptionsBase {
