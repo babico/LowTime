@@ -126,7 +126,7 @@ export function createPgPool(config: PgConfig, overrides: PoolConfig = {}): PgPo
 }
 
 export async function closePgClient(client: PgClient): Promise<void> {
-  void client;
+  await client.end();
 }
 
 /**
@@ -138,6 +138,10 @@ export async function ensureLowtimeSchema(client: PgClient): Promise<void> {
   await client.query(
     `CREATE TABLE IF NOT EXISTS room_metadata (
        slug TEXT PRIMARY KEY,
+       access_mode TEXT NOT NULL,
+       max_participants INTEGER NOT NULL,
+       quality_cap TEXT NOT NULL,
+       allow_screen_share BOOLEAN NOT NULL,
        created_at TIMESTAMPTZ NOT NULL,
        last_activity_at TIMESTAMPTZ NOT NULL,
        closed_at TIMESTAMPTZ,
@@ -146,5 +150,17 @@ export async function ensureLowtimeSchema(client: PgClient): Promise<void> {
   );
   await client.query(
     "CREATE INDEX IF NOT EXISTS room_metadata_last_activity_at_idx ON room_metadata (last_activity_at)",
+  );
+  await client.query(
+    "ALTER TABLE room_metadata ADD COLUMN IF NOT EXISTS access_mode TEXT NOT NULL DEFAULT 'open'",
+  );
+  await client.query(
+    "ALTER TABLE room_metadata ADD COLUMN IF NOT EXISTS max_participants INTEGER NOT NULL DEFAULT 4",
+  );
+  await client.query(
+    "ALTER TABLE room_metadata ADD COLUMN IF NOT EXISTS quality_cap TEXT NOT NULL DEFAULT 'balanced'",
+  );
+  await client.query(
+    "ALTER TABLE room_metadata ADD COLUMN IF NOT EXISTS allow_screen_share BOOLEAN NOT NULL DEFAULT true",
   );
 }
