@@ -98,7 +98,7 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | Web route-level page extraction | `done` | Issue #52. Extracted route-level pages and reduced `App.tsx` size materially | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
-| Web styles extraction from `App.tsx` | `planned` | Issue #53. Shared page styles already moved once; deeper style-module cleanup is still open | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Web styles extraction from `App.tsx` | `done` | Issue #53. Shared page styles already moved; chat-panel styles moved to a dedicated module | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Room and waiting feature-module split | `done` | Issue #54. Room and waiting effects/actions live in feature modules | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Call feature-module split | `done` | Issue #55. Call connection and media sync moved into `features/call/call-effects.ts` | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Preview and install feature-module split | `done` | Issue #56. Install and preview behavior moved into dedicated feature hooks | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
@@ -108,6 +108,10 @@
 | Server room-store domain split | `done` | Issue #60. In-memory store and lobby/session mutations moved into `domain/room-store.ts` | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
 | Server integration test split | `done` | Issue #61. Split route coverage into `rooms`, `lobby`, and `media` test files | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
 | Architecture docs for refactored structure | `done` | Issue #62. Updated frontend/backend architecture docs and contributor guidance to match the shipped layout | [docs/08-backend-architecture.md](docs/08-backend-architecture.md) |
+
+## Followups (post-Phase 5)
+
+| Persist chosen camera and microphone | `done` | Issue #97. New pure `apps/web/src/device-choice-storage.ts` helper: saveDeviceChoice, loadDeviceChoice, clearDeviceChoice. Backed by sessionStorage under `lowtime:device-choice`. The call-page device switcher (#25) is the natural call site; the PR is scoped to the helper so it can land without waiting on the device switcher. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 
 ## Update Rule For Every PR
 - If a feature changes status, update this file.
