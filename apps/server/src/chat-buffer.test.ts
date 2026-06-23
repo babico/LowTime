@@ -19,7 +19,6 @@ function entry(text: string, offsetMs: number, senderId = "sess_1"): ChatEntry {
     senderName: "Alice",
     body: text,
     sentAt: new Date(Date.UTC(2026, 5, 22, 12, 0, 0, offsetMs)).toISOString(),
-    _baseMs: Date.UTC(2026, 5, 22, 12, 0, 0, offsetMs),
   };
 }
 
