@@ -4,11 +4,12 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerLobbyRoutes } from "./routes/lobby.js";
 import { registerMediaRoutes } from "./routes/media.js";
-import { registerMetricsRoutes } from "./routes/metrics.js";
+import { registerPrometheusMetricsRoute } from "./routes/metrics-prometheus.js";
 import { registerReclaimRoutes } from "./routes/reclaim.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerSignalRoutes } from "./routes/signal.js";
+import { registerMetricsRoutes } from "./routes/metrics.js";
 import { createInMemoryRoomStore, type RoomStore } from "./domain/room-store.js";
 import { startCleanupLoop } from "./domain/room-cleanup.js";
 import {
@@ -36,6 +37,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   registerSettingsRoutes(app, context);
   registerReclaimRoutes(app, context);
   registerSignalRoutes(app, context);
+  registerPrometheusMetricsRoute(app, context);
   registerMetricsRoutes(app, context);
 
   const intervalMs = options.cleanupIntervalMs;
