@@ -114,9 +114,6 @@ export function createPgPool(config: PgConfig, overrides: PoolConfig = {}): PgPo
           return client.query(text, params as never[]);
         },
         release: () => client.release(),
-        async end() {
-          await client.end();
-        },
       } as PgClient & { release: () => void };
     },
     async end() {
@@ -125,8 +122,8 @@ export function createPgPool(config: PgConfig, overrides: PoolConfig = {}): PgPo
   };
 }
 
-export async function closePgClient(client: PgClient): Promise<void> {
-  await client.end();
+export async function closePgClient(_client: PgClient): Promise<void> {
+  void _client;
 }
 
 /**
