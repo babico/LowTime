@@ -83,6 +83,9 @@ function wrapClient(client: Client): PgClient {
     async query(text, params) {
       return client.query(text, params as never[]);
     },
+    release: () => {
+      // Single clients own their own connection; release is a no-op.
+    },
     async end() {
       await client.end();
     },
