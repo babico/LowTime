@@ -156,5 +156,5 @@ describe("createPgRoomMetadataStore (live PG)", () => {
 
 void IORedis;
 void ensureLowtimeSchema;
-type _Used = PgRoomMetadataRow;
+type _Used = _Row;
 void (null as unknown as _Used);
