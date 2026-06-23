@@ -40,6 +40,12 @@ async function redisIsReachable(): Promise<boolean> {
       maxRetriesPerRequest: 1,
       connectTimeout: 1500,
     });
+    redis.on("error", () => {
+      // Swallow ioredis connection errors so an unreachable host does
+      // not surface as an "Unhandled error" event when the runner is
+      // not on the user's private network. The Promise.race timeout
+      // above is the real reachability check.
+    });
     await Promise.race([
       redis.connect(),
       new Promise<never>((_, reject) =>
