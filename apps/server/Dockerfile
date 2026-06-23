@@ -1,21 +1,28 @@
-FROM node:20-alpine
+FROM node:22-bookworm-slim AS build
+WORKDIR /repo
 
-WORKDIR /app
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/server/package.json apps/server/
+RUN npm ci --no-audit --no-fund
 
-COPY package.json ./
-COPY tsconfig.base.json ./
-COPY apps/server/package.json ./apps/server/package.json
-COPY apps/server/tsconfig.json ./apps/server/tsconfig.json
-COPY apps/server/src ./apps/server/src
-COPY packages/shared/package.json ./packages/shared/package.json
-COPY packages/shared/tsconfig.json ./packages/shared/tsconfig.json
-COPY packages/shared/src ./packages/shared/src
+COPY packages/shared/ packages/shared/
+COPY apps/server/ apps/server/
+COPY eslint.config.mjs ./
 
-RUN npm install
+RUN npm --workspace @lowtime/server run build
 
-WORKDIR /app/apps/server
+FROM node:22-bookworm-slim AS serve
+WORKDIR /repo
+ENV NODE_ENV=production
+
+COPY --from=build /repo/package.json /repo/package-lock.json ./
+COPY --from=build /repo/packages/shared packages/shared/
+COPY --from=build /repo/apps/server/package.json apps/server/
+COPY --from=build /repo/apps/server/dist apps/server/dist
+
+RUN npm ci --omit=dev --no-audit --no-fund --workspaces --include-workspace-root
 
 EXPOSE 3000
-
-CMD ["npm", "run", "dev"]
-
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/health >/dev/null || exit 1
+CMD ["npm", "--workspace", "@lowtime/server", "start"]
