@@ -98,7 +98,7 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | Web route-level page extraction | `done` | Issue #52. Extracted route-level pages and reduced `App.tsx` size materially | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
-| Web styles extraction from `App.tsx` | `planned` | Issue #53. Shared page styles already moved once; deeper style-module cleanup is still open | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Web styles extraction from `App.tsx` | `done` | Issue #53. App.tsx already routed to `features/page-styles.ts`; this round also moved the local chat-panel styles into `features/call/chat-panel.styles.ts`. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Room and waiting feature-module split | `done` | Issue #54. Room and waiting effects/actions live in feature modules | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Call feature-module split | `done` | Issue #55. Call connection and media sync moved into `features/call/call-effects.ts` | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Preview and install feature-module split | `done` | Issue #56. Install and preview behavior moved into dedicated feature hooks | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
