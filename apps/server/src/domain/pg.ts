@@ -27,6 +27,7 @@ export interface PgClient {
     params?: unknown[],
   ): Promise<QueryResult<R>>;
   end(): Promise<void>;
+  release?(): void;
 }
 
 export interface PgPool {
