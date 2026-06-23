@@ -1,4 +1,4 @@
-import { Redis, type Redis as IORedisType } from "ioredis";
+import { Redis } from "ioredis";
 
 import type { RedisLike } from "./domain/redis-rate-limiter.js";
 
