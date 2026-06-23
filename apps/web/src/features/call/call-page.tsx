@@ -9,6 +9,7 @@ import { getRungLabel } from "../../auto-downgrade.js";
 import type { PromptState } from "../../audio-only-prompt.js";
 import type { P2PCallStatus } from "./call-effects.js";
 import { ChatPanel } from "./chat-panel.js";
+import type { MediaDeviceEntry } from "../../device-switcher.js";
 import {
   callFactsStyle,
   callHeaderBadgeRowStyle,
@@ -18,13 +19,14 @@ import {
   callStatusBadgeStyle,
   controlsPanelStyle,
   dangerControlStyle,
+  deviceSelectRowStyle,
+  deviceSelectStyle,
   localVideoStyle,
   metaTextStyle,
   mutedParagraphStyle,
   networkBadgeStyle,
   remoteTileStyle,
   remoteVideoStyle,
-  screenShareCaptionStyle,
   secondaryControlStyle,
   selfPlaceholderStyle,
   selfViewPanelStyle,
@@ -38,20 +40,22 @@ interface CallPageProps {
   callParticipants: number;
   callSession: StoredCallSession | null;
   callStatus: "idle" | "requesting_token" | "connecting" | "connected";
+  cameras: MediaDeviceEntry[];
   connectedSfuUrl: string | null;
   hasLocalVideo: boolean;
   hasRemoteVideo: boolean;
   isCameraEnabled: boolean;
   isMicEnabled: boolean;
-  isScreenShareSupported: boolean;
-  isScreenSharing: boolean;
+  isSwitchingDevice: boolean;
   isTogglingCamera: boolean;
   isTogglingMic: boolean;
-  isTogglingScreenShare: boolean;
   localVideoRef: RefObject<HTMLVideoElement | null>;
+  microphones: MediaDeviceEntry[];
   networkHealth: NetworkHealth;
   remoteParticipantLabel: string;
   remoteVideoRef: RefObject<HTMLVideoElement | null>;
+  selectedCameraId: string | null;
+  selectedMicrophoneId: string | null;
   slug: string;
   downgradeRung: DowngradeRung;
   audioOnlyPromptState: PromptState;
@@ -64,9 +68,9 @@ interface CallPageProps {
   onRestoreQuality: () => void;
   onAcceptAudioOnly: () => void;
   onDismissAudioOnly: () => void;
+  onSwitchDevice: (kind: "videoinput" | "audioinput", deviceId: string) => void;
   onToggleCamera: () => Promise<void>;
   onToggleMicrophone: () => Promise<void>;
-  onToggleScreenShare: () => Promise<void>;
 }
 
 export function CallPage(props: CallPageProps) {
@@ -153,11 +157,6 @@ export function CallPage(props: CallPageProps) {
               <h2 style={tileHeadingStyle}>You</h2>
               <span>{props.callSession.displayName}</span>
             </div>
-            {props.isScreenSharing ? (
-              <p style={screenShareCaptionStyle} role="status" aria-live="polite">
-                Sharing your screen
-              </p>
-            ) : null}
             {props.hasLocalVideo && props.isCameraEnabled ? (
               <video
                 ref={props.localVideoRef}
@@ -215,23 +214,53 @@ export function CallPage(props: CallPageProps) {
             >
               {props.isTogglingCamera ? "Updating Camera..." : props.isCameraEnabled ? "Turn Camera Off" : "Turn Camera On"}
             </button>
-            {props.isScreenShareSupported ? (
-              <button
-                type="button"
-                onClick={() => void props.onToggleScreenShare()}
-                disabled={controlsDisabled || props.isTogglingScreenShare}
-                style={secondaryControlStyle}
-              >
-                {props.isTogglingScreenShare
-                  ? "Updating Screen Share..."
-                  : props.isScreenSharing
-                    ? "Stop Sharing"
-                    : "Share Screen"}
-              </button>
-            ) : null}
             <button type="button" onClick={props.onLeaveCall} style={dangerControlStyle}>
               Leave Call
             </button>
+          </section>
+          <section style={deviceSelectRowStyle} aria-label="Device selection">
+            <label style={deviceSelectStyle}>
+              <span>Camera</span>
+              <select
+                value={props.selectedCameraId ?? ""}
+                onChange={(event) => props.onSwitchDevice("videoinput", event.target.value)}
+                disabled={controlsDisabled || props.isSwitchingDevice || props.cameras.length === 0}
+              >
+                {props.cameras.length === 0 ? (
+                  <option value="">No cameras detected</option>
+                ) : (
+                  <>
+                    {!props.selectedCameraId ? <option value="">Default camera</option> : null}
+                    {props.cameras.map((camera) => (
+                      <option key={camera.deviceId} value={camera.deviceId}>
+                        {camera.label || "Camera"}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </label>
+            <label style={deviceSelectStyle}>
+              <span>Microphone</span>
+              <select
+                value={props.selectedMicrophoneId ?? ""}
+                onChange={(event) => props.onSwitchDevice("audioinput", event.target.value)}
+                disabled={controlsDisabled || props.isSwitchingDevice || props.microphones.length === 0}
+              >
+                {props.microphones.length === 0 ? (
+                  <option value="">No microphones detected</option>
+                ) : (
+                  <>
+                    {!props.selectedMicrophoneId ? <option value="">Default microphone</option> : null}
+                    {props.microphones.map((mic) => (
+                      <option key={mic.deviceId} value={mic.deviceId}>
+                        {mic.label || "Microphone"}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </label>
           </section>
           {props.callError ? <p role="alert">{props.callError}</p> : null}
           {props.p2pError && props.p2pStatus === "failed" ? (
