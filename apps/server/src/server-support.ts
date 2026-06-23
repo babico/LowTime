@@ -13,6 +13,11 @@ import {
   createInMemoryReclaimRateLimiter,
   type ReclaimRateLimiter,
 } from "./domain/reclaim-rate-limiter.js";
+import {
+  createRedisPasscodeRateLimiter,
+  createRedisReclaimRateLimiter,
+  type RedisLike,
+} from "./domain/redis-rate-limiter.js";
 import type { CleanupScheduler } from "./domain/room-cleanup.js";
 import {
   createInMemorySignalBus,
@@ -23,6 +28,7 @@ import {
   type RoomStore,
   type StoredRoom,
 } from "./domain/room-store.js";
+import { createRedisClientFromEnv } from "./redis-client.js";
 import type { IceServerConfig } from "@lowtime/shared";
 
 /** Default ICE servers used when no override is provided. */
@@ -58,6 +64,14 @@ export interface BuildAppOptions {
    * default `true` is used.
    */
   logger?: FastifyServerOptions["logger"];
+  /**
+   * Optional Redis client. When provided, the rate limiters are
+   * created on top of this client instead of using the in-memory
+   * implementations. When omitted, `createRouteContext` falls back
+   * to `createRedisClientFromEnv()` and then to in-memory when no
+   * `REDIS_URL` is set.
+   */
+  redis?: RedisLike | null;
 }
 
 export interface RouteContext {
@@ -71,14 +85,38 @@ export interface RouteContext {
   iceServers: IceServerConfig[];
 }
 
+function buildRateLimiters(
+  options: BuildAppOptions,
+  redis: RedisLike | null,
+): { passcode: PasscodeRateLimiter; reclaim: ReclaimRateLimiter } {
+  if (redis == null) {
+    return {
+      passcode: options.passcodeRateLimiter ?? createInMemoryPasscodeRateLimiter(),
+      reclaim: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
+    };
+  }
+  return {
+    passcode: options.passcodeRateLimiter ?? createRedisPasscodeRateLimiter({
+      redis,
+      keyPrefix: "lowtime:rl:passcode",
+    }),
+    reclaim: options.reclaimRateLimiter ?? createRedisReclaimRateLimiter({
+      redis,
+      keyPrefix: "lowtime:rl:reclaim",
+    }),
+  };
+}
+
 export function createRouteContext(options: BuildAppOptions = {}): RouteContext {
+  const redis = options.redis ?? createRedisClientFromEnv();
+  const limiters = buildRateLimiters(options, redis);
   return {
     liveKitConfig: options.liveKitConfig === undefined ? getLiveKitConfig() : options.liveKitConfig,
     now: options.now ?? (() => new Date()),
     roomStore: options.roomStore ?? createInMemoryRoomStore(),
     passcodeVerifier: options.passcodeVerifier ?? createArgon2idPasscodeVerifier(),
-    passcodeRateLimiter: options.passcodeRateLimiter ?? createInMemoryPasscodeRateLimiter(),
-    reclaimRateLimiter: options.reclaimRateLimiter ?? createInMemoryReclaimRateLimiter(),
+    passcodeRateLimiter: limiters.passcode,
+    reclaimRateLimiter: limiters.reclaim,
     signalBus: options.signalBus ?? createInMemorySignalBus(),
     iceServers: options.iceServers ?? DEFAULT_ICE_SERVERS,
   };
