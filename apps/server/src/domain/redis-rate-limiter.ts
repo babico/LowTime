@@ -32,7 +32,7 @@ export interface RoomCreateRateLimiter {
 
 export interface RedisLike {
   zadd(key: string, score: number, member: string): Promise<unknown>;
-  zremrangebyscore(key: string, min: number, max: number): Promise<unknown>;
+  zremrangebyscore(key: string, min: number | string, max: number | string): Promise<unknown>;
   zcard(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<unknown>;
   del(...keys: string[]): Promise<number>;
