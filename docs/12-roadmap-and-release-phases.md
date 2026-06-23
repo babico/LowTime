@@ -57,7 +57,7 @@ The delivery plan prioritizes the smallest viable real-time path first, then lay
   - core device-switching flows are covered
 
 ## Phase 5: Small-Group Beta
-- Raise supported room size to 4 participants.
+- Raise supported room size to 4 participants. ✅ Issue #28 (default `maxParticipants` is now 4; validation cap stays at 4).
 - Harden SFU subscription logic and participant layout.
 - Validate group quality metrics before broader rollout.
 - Exit criteria:

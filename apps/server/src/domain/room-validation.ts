@@ -10,7 +10,7 @@ import type {
 
 import type { CreateStoredRoomInput } from "./room-store.js";
 
-const DEFAULT_MAX_PARTICIPANTS = 2;
+const DEFAULT_MAX_PARTICIPANTS = 4;
 const DEFAULT_QUALITY_CAP: QualityCap = "balanced";
 const DEFAULT_ACCESS_MODE: AccessMode = "open";
 const DEFAULT_ALLOW_SCREEN_SHARE = true;

@@ -207,7 +207,11 @@ import { createInMemoryRoomStore as createStore } from "./domain/room-store.js";
 
 describe("POST /api/rooms/:slug/token — P2P branch", () => {
   async function setupRoomWith2Sessions(app: ReturnType<typeof buildApp>) {
-    const createResponse = await app.inject({ method: "POST", url: "/api/rooms" });
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/rooms",
+      payload: { maxParticipants: 2 },
+    });
     const { roomSlug } = createResponse.json() as { roomSlug: string };
 
     const join1 = await app.inject({
