@@ -68,17 +68,17 @@
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
 | Lightweight in-room chat | `done` | Issue #23. Added ephemeral `chat.send`/`chat.received` signaling, `ChatPanel` component on the call page, `chatMessages` state in `useRoomSignaling`, and `ChatMessage` type in shared package | [docs/05-api-and-realtime-contracts.md](docs/05-api-and-realtime-contracts.md) |
-| Desktop screen share | `planned` | Hide on unsupported browsers | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Device switching | `planned` | Front/back camera and mic/speaker selection where supported | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
-| Pause incoming video control | `planned` | User-level bandwidth control | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
-| Host remove participant | `planned` | Basic moderation control | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+| Desktop screen share | `done` | Issue #24. `requestScreenShareToggle` pure helper + `screen-share.ts` facade; call page renders a "Stop sharing" button while active and the remote tile shows a "Sharing screen" placeholder | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Device switching | `done` | Issue #25. `device-switcher.ts` pure helper; call page renders a mic + camera select; choices persist across sessions via `device-choice-storage.ts` | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Pause incoming video control | `done` | Issue #26. `remote-video-toggle.ts` calls `setSubscribed(trackSid, false)` for every remote video publication; call page renders Pause/Resume Video button and a "Remote video paused" placeholder | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
+| Host remove participant | `done` | Issue #27 + #99. `POST /api/rooms/:slug/participants/:sessionId/remove` server route + `host-actions.ts` client wrapper + `use-room-moderation` hook on the room page; call page already had the Remove button via #27 | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 
 ## Phase 5: Small-Group Beta
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| Raise room size to 4 participants | `planned` | Beta label remains until metrics are healthy | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
-| Group participant layout | `planned` | Responsive layout beyond 1:1 | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Raise room size to 4 participants | `done` | Issue #28. Default `maxParticipants` is now 4; validation cap stays at 4 | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
+| Group participant layout | `done` | Issue #29. Per-participant tiles on the call page via the participant-aware remote-renderer in `call-effects.ts` | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | SFU subscription tuning for groups | `done` | Issue #30. Group rooms (maxParticipants > 2) lower the local publish bitrate by 40% (floored at 80 kbps) via the new `applyGroupRoomTuning` helper in `apps/web/src/group-room-tuning.ts`. `connectToSfu` accepts the new `maxParticipants` input and applies the tuning only when the room is a group. `adaptiveStream` and `dynacast` were already on and continue to drive per-tile quality. | [docs/04-media-and-quality.md](docs/04-media-and-quality.md) |
 | Group beta validation metrics | `done` | Issue #31. In-process metrics module (`apps/server/src/domain/metrics.ts`) with counters for room create, join success/reject reasons, lobby decisions, passcode failures. Exposes a JSON `GET /api/metrics/summary` endpoint that returns the counter snapshot. Counters are emitted from the rooms route for the create + join paths. Prometheus export and OpenTelemetry traces are tracked as separate follow-up issues. | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
 
@@ -86,12 +86,12 @@
 
 | Feature | Status | Notes | Source |
 | --- | --- | --- | --- |
-| PostgreSQL room metadata | `in_progress` | Durable room state and audit events. Slice 1: client + migration shipped (PR #106). | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
-| Redis live room state | `planned` | Presence, lobby, reconnect, rate limits, chat buffer | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
-| coturn integration | `planned` | NAT traversal and relay support | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
+| PostgreSQL room metadata | `done` | Issue #32. Slice 1: thin `pg.Pool` + `createPgClient` + idempotent `ensureLowtimeSchema` migration runner (`PR #106`). Slice 2: `PgRoomMetadataStore` implements the same `RoomStore` interface backed by `room_metadata` rows (`PR #115`). Wiring into `BuildAppOptions` is a follow-up (the in-memory store is still the default). | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| Redis live room state | `in_progress` | Issue #33. Five pure modules shipped: rate limiters (#101), presence (#105), lobby decisions (#109), reconnect window (#111), chat buffer (#113). Wired into `createRouteContext` only for the rate limiters via `createRedisClientFromEnv` (#102). Presence, lobby, reconnect, and chat still need the same wiring. Live smoke tests auto-skip when the user's private Redis at `192.168.21.2:16379` is unreachable. | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| coturn integration | `in_progress` | Issue #34. Slice 1: `generateTurnCredentials` pure helper + `turn-credentials.test.ts` (`PR #117`). Slice 2 (wire the credentials into the join response) and slice 3 (rotating-secret rotation) are still open. | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
 | Docker-based deployment packaging | `done` | Compose now defines web, server, postgres, redis, coturn, and optional LiveKit services | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
-| Metrics, logs, and dashboards | `planned` | Product, media, and abuse visibility | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
-| Abuse and rate-limit controls | `in_progress` | Issue #37. Adds a per-IP room-create rate limiter (sliding window) and a "create-failures" counter that drops abusive clients. New pure module `apps/server/src/domain/room-create-rate-limiter.ts`; wiring in `apps/server/src/routes/rooms.ts`. Passcode and reclaim rate limiters already exist. | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
+| Metrics, logs, and dashboards | `in_progress` | Issue #36. In-process metrics (#31, #127), Prometheus exposition endpoint (#36 slice 1, #129), Grafana dashboard JSON (#36 slice 2, #119), and the import instructions (#36 slice 3, #121) are all shipped. OpenTelemetry traces are a separate follow-up. | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
+| Abuse and rate-limit controls | `done` | Issue #37. Per-IP room-create rate limiter (sliding window) and create-failures counter drop abusive clients. New pure module `apps/server/src/domain/room-create-rate-limiter.ts`; wiring in `apps/server/src/routes/rooms.ts`. Passcode and reclaim rate limiters already exist (#12, #13). | [docs/09-security-and-abuse.md](docs/09-security-and-abuse.md) |
 
 ## Refactor Program
 
@@ -111,7 +111,19 @@
 
 ## Followups (post-Phase 5)
 
-| Persist chosen camera and microphone | `done` | Issue #97. New pure `apps/web/src/device-choice-storage.ts` helper: saveDeviceChoice, loadDeviceChoice, clearDeviceChoice. Backed by sessionStorage under `lowtime:device-choice`. The call-page device switcher (#25) is the natural call site; the PR is scoped to the helper so it can land without waiting on the device switcher. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Persist chosen camera and microphone | `done` | Issue #97. `saveDeviceChoice` / `loadDeviceChoice` / `clearDeviceChoice` in `apps/web/src/device-choice-storage.ts`; sessionStorage under `lowtime:device-choice`. Call-page device switcher (#25) is the natural call site. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
+| Host remove from room page | `done` | Issue #99. `use-room-moderation` hook + Remove button in the room-page admitted-sessions list, reuses the call-page `host-actions.ts` wrapper. | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
+| Wire Redis presence into BuildAppOptions | `planned` | Use `createRedisPresence` when `REDIS_URL` is set; otherwise in-memory. Mirrors the rate-limiter wiring from #102. | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| Wire Redis lobby decisions into BuildAppOptions | `planned` | Same shape: `createRedisLobby` when `REDIS_URL` is set, otherwise the existing in-memory room-store path. | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| Wire Redis reconnect window into BuildAppOptions | `planned` | `createRedisReconnectState` when `REDIS_URL` is set. | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| Wire Redis chat buffer into BuildAppOptions | `planned` | `createRedisChatBuffer` when `REDIS_URL` is set; otherwise the ephemeral signaling-only chat from #23 stays the default. | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| Wire PG room metadata into BuildAppOptions | `planned` | `createPgRoomMetadataStore` when `PG_URL` is set; otherwise in-memory. The schema and store are already in main. | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
+| coturn slice 2: wire credentials into join response | `planned` | `POST /api/rooms/:slug/token` returns the LiveKit token + the freshly generated TURN credentials. Web client merges them into `iceServers` before connecting. | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
+| coturn slice 3: rotating-secret rotation | `planned` | Replace the static TURN secret with a rotating set of secrets so credentials issued at `now` verify against the secret set valid at `now`. | [docs/02-system-architecture.md](docs/02-system-architecture.md) |
+| OpenTelemetry traces for join, token, reclaim, lobby | `planned` | Spec doc already calls this out. Spans the four flows; OTLP exporter; small set of attributes per span. | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
+| Client-side error reporting | `planned` | Sentry-style sink for frontend crashes and severe media setup failures. Today the network badge is the only client-side health surface. | [docs/10-observability-and-operations.md](docs/10-observability-and-operations.md) |
+| Native wrappers (PWA -> TWA / Capacitor) | `planned` | Roadmap Future Work bullet. Evaluate after PWA demonstrates product fit. | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
+| Persistent identity | `planned` | Roadmap Future Work bullet. Revisit only if product usage shows a strong need. | [docs/12-roadmap-and-release-phases.md](docs/12-roadmap-and-release-phases.md) |
 
 ## Update Rule For Every PR
 - If a feature changes status, update this file.
