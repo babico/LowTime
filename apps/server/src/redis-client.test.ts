@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { describe, test } from "node:test";
 
 import { createRedisClientFromEnv } from "./redis-client.js";
+import type { RedisLike } from "./domain/redis-rate-limiter.js";
 
 describe("createRedisClientFromEnv", () => {
   test("returns null when REDIS_URL is not set", () => {
@@ -43,6 +44,8 @@ describe("createRedisClientFromEnv", () => {
     try {
       const client = createRedisClientFromEnv();
       assert.notEqual(client, null);
+      const _typed: RedisLike | null = client;
+      void _typed;
     } finally {
       if (saved != null) process.env.REDIS_URL = saved;
     }
