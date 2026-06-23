@@ -11,6 +11,10 @@ export function toRoomSummary(room: StoredRoom, now = new Date()): RoomSummary {
     allowScreenShare: room.allowScreenShare,
     status: getRoomStatus(room, now),
     expiresAt: room.expiresAt,
+    participants: room.sessions.map((session) => ({
+      id: session.id,
+      displayName: session.displayName,
+    })),
   };
 }
 

@@ -28,12 +28,13 @@ import { computeEffectivePublishOptions } from "./quality-presets.js";
 import { joinRoomRequest, submitLobbyAction } from "./features/room/room-actions.js";
 import { useDevicePreview } from "./features/room/preview-effects.js";
 import { useRoomPageData, useHostReclaim } from "./features/room/room-effects.js";
-import { useRoomSignaling } from "./features/room/room-signaling.js";
+import { useRoomSignaling, type P2PSignalEvent } from "./features/room/room-signaling.js";
 import { useWaitingRoomState } from "./features/waiting/waiting-effects.js";
 import { assessNetworkHealth, type NetworkHealth } from "./network-health.js";
 import {
   clearStoredLobbyRequest,
   getApiBaseUrl,
+  loadStoredCallSession,
   saveStoredHostSecret,
   saveStoredLobbyRequest,
   saveStoredCallSession,
@@ -82,6 +83,7 @@ export function App() {
   const effectiveHostSecret =
     hostReclaim.status === "unlocked" ? hostReclaim.hostSecret : null;
   const hostSecret = effectiveHostSecret;
+  const isHost = hostSecret != null && hostSecret !== "";
   const reclaimRoomPageProps = {
     reclaimStatus: hostReclaim.status,
     reclaimManualError: hostReclaim.manualError,
@@ -145,6 +147,27 @@ export function App() {
   // Passed to useCallFlow so P2P fallback can send messages without a
   // circular hook dependency.
   const sendSignalMessageRef = useRef<(message: Record<string, unknown>) => void>(() => {});
+  const removedFromRoomRef = useRef<boolean>(false);
+  const handleP2PMessageRef = useRef<(event: P2PSignalEvent) => void>(() => {});
+
+  // Read the stored call session directly so the signaling socket can
+  // attach on the first render instead of waiting for the call-flow state
+  // to land on a later render.
+  const initialCallSessionId =
+    viewState.kind === "call"
+      ? loadStoredCallSession(window.sessionStorage, viewState.slug)?.sessionId ?? null
+      : null;
+
+  // Live room signaling: subscribe while we have a concrete sessionId so
+  // `room.settings_updated` events propagate to the page in real time.
+  const { latestRoomSummary, sendSignalMessage, chatMessages, removedFromRoom } = useRoomSignaling({
+    apiBaseUrl,
+    slug: viewState.kind === "call" ? viewState.slug : null,
+    sessionId: initialCallSessionId,
+    onP2PMessage: (event) => handleP2PMessageRef.current(event),
+  });
+
+  removedFromRoomRef.current = removedFromRoom;
 
   const {
     callError,
@@ -155,19 +178,14 @@ export function App() {
     connectedSfuUrl,
     handleLeaveCall,
     handleP2PMessage,
+    handleRemoveParticipant,
     handleToggleCamera,
     handleToggleMicrophone,
-    handleToggleScreenShare,
-    handleToggleRemoteVideo,
     isCameraEnabled,
     isMicEnabled,
-    isRemoteVideoPaused,
-    isScreenShareSupported,
-    isScreenSharing,
+    isRemovingParticipant,
     isTogglingCamera,
     isTogglingMic,
-    isTogglingRemoteVideo,
-    isTogglingScreenShare,
     localVideoRef,
     localVideoTrack,
     p2pError,
@@ -181,16 +199,12 @@ export function App() {
     viewState,
     sendSignalMessage: (msg) => sendSignalMessageRef.current(msg),
     maxParticipants: roomSummary?.maxParticipants,
+    hostSecret,
+    isHost,
+    removedFromRoomRef,
   });
 
-  // Live room signaling: subscribe while we have a concrete sessionId so
-  // `room.settings_updated` events propagate to the page in real time.
-  const { latestRoomSummary, sendSignalMessage, chatMessages } = useRoomSignaling({
-    apiBaseUrl,
-    slug: viewState.kind === "call" ? viewState.slug : null,
-    sessionId: callSession?.sessionId ?? null,
-    onP2PMessage: handleP2PMessage,
-  });
+  handleP2PMessageRef.current = handleP2PMessage;
 
   // Keep the ref in sync so useCallFlow's sendSignalMessage wrapper is always current.
   sendSignalMessageRef.current = sendSignalMessage;
@@ -481,24 +495,21 @@ export function App() {
         hasLocalVideo: localVideoTrack != null,
         hasRemoteVideo: remoteVideoTrack != null,
         isCameraEnabled,
+        isHost,
         isMicEnabled,
+        isRemovingParticipant,
         isTogglingCamera,
         isTogglingMic,
-        isScreenShareSupported,
-        isScreenSharing,
-        isTogglingScreenShare,
-        isRemoteVideoPaused,
-        isTogglingRemoteVideo,
         localVideoRef,
         networkHealth,
         onAcceptAudioOnly: handleAcceptAudioOnly,
         onDismissAudioOnly: dismissAudioOnlyPrompt,
         onLeaveCall: handleLeaveCall,
+        onRemoveParticipant: handleRemoveParticipant,
         onRestoreQuality: restoreQuality,
         onToggleCamera: handleToggleCamera,
         onToggleMicrophone: handleToggleMicrophone,
-        onToggleRemoteVideo: handleToggleRemoteVideo,
-        onToggleScreenShare: handleToggleScreenShare,
+        participants: latestRoomSummary?.participants ?? [],
         p2pError,
         p2pStatus,
         chatMessages,

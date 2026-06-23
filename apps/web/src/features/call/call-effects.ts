@@ -7,17 +7,9 @@ import {
   getParticipant,
   getParticipantLabel,
   getPrimaryParticipant,
-  pickPrimaryVideoTrack,
   type VideoTrackLike,
 } from "../../call-experience.js";
 import { connectToSfu } from "../../media-controller.js";
-import {
-  hasActiveScreenShare,
-  isScreenShareSupported,
-  requestScreenShareToggle,
-  type ScreenShareRoomLike,
-} from "../../screen-share.js";
-import { setRemoteVideoSubscription, type RemoteVideoRoomLike } from "../../remote-video-toggle.js";
 import {
   clearStoredCallSession,
   getViewState,
@@ -25,6 +17,7 @@ import {
   type StoredCallSession,
   type ViewState,
 } from "../../room-entry.js";
+import { removeParticipantRequest } from "../../host-actions.js";
 import type { P2PCallStatus } from "./use-p2p-fallback.js";
 import { useP2PFallback } from "./use-p2p-fallback.js";
 
@@ -36,6 +29,9 @@ const DEFAULT_REQUESTED_MEDIA = {
 interface UseCallFlowInput {
   apiBaseUrl: string;
   setViewState: (viewState: ViewState) => void;
+  hostSecret: string | null;
+  isHost: boolean;
+  removedFromRoomRef: { current: boolean };
   viewState: ViewState;
   /** Injected from useRoomSignaling to send P2P signal messages. */
   sendSignalMessage?: (message: Record<string, unknown>) => void;
@@ -57,10 +53,7 @@ export function useCallFlow(input: UseCallFlowInput) {
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<VideoTrackLike | null>(null);
   const [remoteParticipantLabel, setRemoteParticipantLabel] = useState<string>("Waiting for someone to join");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
-  const [isTogglingScreenShare, setIsTogglingScreenShare] = useState<boolean>(false);
-  const [isRemoteVideoPaused, setIsRemoteVideoPaused] = useState<boolean>(false);
-  const [isTogglingRemoteVideo, setIsTogglingRemoteVideo] = useState<boolean>(false);
+  const [isRemovingParticipant, setIsRemovingParticipant] = useState<string | null>(null);
 
   const callRoomRef = useRef<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
   const [callRoom, setCallRoom] = useState<Awaited<ReturnType<typeof connectToSfu>> | null>(null);
@@ -69,6 +62,20 @@ export function useCallFlow(input: UseCallFlowInput) {
 
   const slug = input.viewState.kind === "call" ? input.viewState.slug : "";
   const sessionId = callSession?.sessionId ?? "";
+
+  useEffect(() => {
+    if (!input.removedFromRoomRef.current) {
+      return;
+    }
+    if (callRoomRef.current == null) {
+      return;
+    }
+    callRoomRef.current.disconnect();
+    callRoomRef.current = null;
+    setCallRoom(null);
+    setCallStatus("idle");
+    setCallError("The host removed you from this call.");
+  }, [input.removedFromRoomRef.current]);
 
   const p2pFallback = useP2PFallback({
     apiBaseUrl: input.apiBaseUrl,
@@ -113,10 +120,6 @@ export function useCallFlow(input: UseCallFlowInput) {
     setCallError(null);
     setIsMicEnabled(storedSession.requestedMedia.audio);
     setIsCameraEnabled(storedSession.requestedMedia.video);
-    setIsScreenSharing(false);
-    setIsTogglingScreenShare(false);
-    setIsRemoteVideoPaused(false);
-    setIsTogglingRemoteVideo(false);
   }, [input.viewState]);
 
   useEffect(() => {
@@ -251,15 +254,9 @@ export function useCallFlow(input: UseCallFlowInput) {
           const nextLocalParticipant = getParticipant(room.localParticipant);
 
           setCallParticipants(room.remoteParticipants.size + 1);
-          setLocalVideoTrack(pickPrimaryVideoTrack(nextLocalParticipant));
+          setLocalVideoTrack(getFirstVideoTrack(nextLocalParticipant));
           setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
           setRemoteParticipantLabel(getParticipantLabel(nextRemoteParticipant, "Waiting for someone to join"));
-
-          const activeScreenShare = hasActiveScreenShare(nextLocalParticipant);
-
-          if (activeScreenShare !== isScreenSharing) {
-            setIsScreenSharing(activeScreenShare);
-          }
         };
 
         const handleDisconnected = () => {
@@ -364,7 +361,7 @@ export function useCallFlow(input: UseCallFlowInput) {
       await room.localParticipant.setCameraEnabled(nextValue);
       setIsCameraEnabled(nextValue);
       const nextLocalParticipant = getParticipant(room.localParticipant);
-      setLocalVideoTrack(pickPrimaryVideoTrack(nextLocalParticipant));
+      setLocalVideoTrack(nextValue ? getFirstVideoTrack(nextLocalParticipant) : null);
     } catch (error) {
       setCallError(error instanceof Error ? error.message : "Unable to update camera state");
     } finally {
@@ -372,54 +369,35 @@ export function useCallFlow(input: UseCallFlowInput) {
     }
   }
 
-  async function handleToggleScreenShare() {
-    const room = callRoomRef.current as ScreenShareRoomLike | null;
-    const nextValue = !isScreenSharing;
-    setIsTogglingScreenShare(true);
-    setCallError(null);
-
-    const result = await requestScreenShareToggle({
-      room,
-      nextValue,
-      onError: (message) => setCallError(message),
-    });
-
-    if (result.ok) {
-      setIsScreenSharing(nextValue);
-    }
-
-    setIsTogglingScreenShare(false);
-  }
-
-  async function handleToggleRemoteVideo() {
-    const room = callRoomRef.current as RemoteVideoRoomLike | null;
-    const nextValue = !isRemoteVideoPaused;
-    setIsTogglingRemoteVideo(true);
-    setCallError(null);
-
-    const result = await setRemoteVideoSubscription({
-      room,
-      subscribed: !nextValue,
-      onError: (message) => setCallError(message),
-    });
-
-    if (result.ok) {
-      setIsRemoteVideoPaused(nextValue);
-      if (nextValue) {
-        setRemoteVideoTrack(null);
-      } else if (room != null) {
-        const nextRemoteParticipant = getPrimaryParticipant(
-          (room as { remoteParticipants: Map<string, unknown> }).remoteParticipants.values(),
-        );
-        setRemoteVideoTrack(getFirstVideoTrack(nextRemoteParticipant));
-      }
-    }
-
-    setIsTogglingRemoteVideo(false);
-  }
-
   /** Callback to pass to useRoomSignaling's onP2PMessage. */
   const handleP2PMessage = p2pFallback.handleP2PMessage;
+
+  async function handleRemoveParticipant(targetSessionId: string) {
+    if (!input.isHost || input.hostSecret == null || input.hostSecret === "") {
+      setCallError("Only the host can remove participants.");
+      return;
+    }
+
+    if (input.viewState.kind !== "call") {
+      return;
+    }
+
+    setIsRemovingParticipant(targetSessionId);
+    setCallError(null);
+
+    const result = await removeParticipantRequest({
+      apiBaseUrl: input.apiBaseUrl,
+      slug: input.viewState.slug,
+      sessionId: targetSessionId,
+      hostSecret: input.hostSecret,
+    });
+
+    if (!result.ok) {
+      setCallError(result.message);
+    }
+
+    setIsRemovingParticipant(null);
+  }
 
   return {
     callError,
@@ -430,19 +408,14 @@ export function useCallFlow(input: UseCallFlowInput) {
     connectedSfuUrl,
     handleLeaveCall,
     handleP2PMessage,
+    handleRemoveParticipant,
     handleToggleCamera,
     handleToggleMicrophone,
-    handleToggleRemoteVideo,
-    handleToggleScreenShare,
     isCameraEnabled,
     isMicEnabled,
-    isRemoteVideoPaused,
-    isScreenShareSupported: isScreenShareSupported(),
-    isScreenSharing,
+    isRemovingParticipant,
     isTogglingCamera,
     isTogglingMic,
-    isTogglingRemoteVideo,
-    isTogglingScreenShare,
     localVideoRef,
     localVideoTrack,
     p2pError: p2pFallback.p2pError,

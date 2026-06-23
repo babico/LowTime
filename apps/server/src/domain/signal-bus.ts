@@ -10,6 +10,7 @@ export type SignalServerEvent =
   | { kind: "room.settings_updated"; room: RoomSummary }
   | { kind: "transport.switch_available"; nextTransport: "p2p" }
   | { kind: "chat.received"; message: ChatMessage }
+  | { kind: "participant_removed"; sessionId: string; reason: "host_removed" }
   | { kind: "error"; code: string; message: string };
 
 export type SignalHandler = (event: SignalServerEvent) => void;

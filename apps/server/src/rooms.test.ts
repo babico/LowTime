@@ -30,6 +30,7 @@ test("POST /api/rooms creates a room with defaults and host secret", async () =>
     allowScreenShare: true,
     status: "created",
     expiresAt: "2026-03-24T14:00:00.000Z",
+    participants: [],
   });
 
   await app.close();
@@ -87,6 +88,7 @@ test("GET /api/rooms/:slug returns public room metadata", async () => {
     allowScreenShare: false,
     status: "created",
     expiresAt: "2026-03-24T14:00:00.000Z",
+    participants: [],
   });
 
   await app.close();
