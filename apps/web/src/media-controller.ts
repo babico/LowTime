@@ -8,6 +8,7 @@ import type {
   SfuTokenResponse,
 } from "@lowtime/shared";
 
+import { applyGroupRoomTuning } from "./group-room-tuning.js";
 import {
   computeEffectivePublishOptions,
   type EffectivePublishOptions,
@@ -19,6 +20,13 @@ export interface ConnectToSfuInput {
   qualityPreset?: QualityPreset;
   qualityCap?: QualityCap;
   advancedPrefs?: AdvancedMediaPrefs;
+  /**
+   * Number of admitted participants the room allows. When greater than
+   * two, `connectToSfu` lowers the local publish bitrate so the SFU
+   * does not pay full per-tile cost on every other participant.
+   * See Issue #30.
+   */
+  maxParticipants?: number;
 }
 
 /**
@@ -55,10 +63,15 @@ function buildLiveKitOptions(
 }
 
 export async function connectToSfu(input: ConnectToSfuInput): Promise<Room> {
-  const effective = computeEffectivePublishOptions({
+  const computed = computeEffectivePublishOptions({
     preset: input.qualityPreset ?? "balanced",
     cap: input.qualityCap ?? "high",
     advanced: input.advancedPrefs,
+  });
+  const isGroup = typeof input.maxParticipants === "number" && input.maxParticipants > 2;
+  const effective = applyGroupRoomTuning({
+    options: computed,
+    isGroupRoom: isGroup,
   });
   const liveKitOptions = buildLiveKitOptions(effective);
 

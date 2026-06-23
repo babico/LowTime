@@ -250,6 +250,7 @@ export function useCallFlow(input: UseCallFlowInput) {
             requestedMedia: activeCallSession.requestedMedia,
             qualityPreset: activeCallSession.qualityPreset,
             advancedPrefs: activeCallSession.advancedPrefs,
+            maxParticipants: input.maxParticipants,
           });
         } catch (sfuError) {
           // SFU connection failed — try P2P fallback for 1:1 rooms.
