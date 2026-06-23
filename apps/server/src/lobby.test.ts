@@ -1,262 +1,122 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { strict as assert } from "node:assert";
+import { describe, test } from "node:test";
 
-import { buildApp } from "./app.js";
+import RedisMock from "ioredis-mock";
 
-test("POST /api/rooms/:slug/join returns waiting for lobby rooms", async () => {
-  const app = buildApp();
+import {
+  createInMemoryLobby,
+  createRedisLobby,
+  type Lobby,
+  type RedisLike,
+} from "./domain/lobby.js";
 
-  const createResponse = await app.inject({
-    method: "POST",
-    url: "/api/rooms",
-    payload: {
-      accessMode: "lobby",
-    },
+function now(offsetMs: number = 0): Date {
+  return new Date(Date.UTC(2026, 5, 22, 12, 0, 0, offsetMs));
+}
+
+describe("createInMemoryLobby", () => {
+  function newLobby(cap?: number): Lobby {
+    return createInMemoryLobby(cap != null ? { recentDecisionsCap: cap } : {});
+  }
+
+  test("enqueue then list returns the request", async () => {
+    const lobby = newLobby();
+    const id = await lobby.enqueue({ roomSlug: "alpha", displayName: "Alice", now: now() });
+    assert.equal(typeof id, "string");
+    const items = await lobby.list("alpha");
+    assert.equal(items.length, 1);
+    assert.equal(items[0]?.displayName, "Alice");
   });
 
-  const { roomSlug } = createResponse.json();
-
-  const response = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/join`,
-    payload: {
-      displayName: "Lobby Guest",
-    },
+  test("decide marks the request as approved and removes it from the queue", async () => {
+    const lobby = newLobby();
+    const id = await lobby.enqueue({ roomSlug: "alpha", displayName: "Alice", now: now() });
+    const decided = await lobby.decide("alpha", id, "approve", now(1000));
+    assert.equal(decided.ok, true);
+    const items = await lobby.list("alpha");
+    assert.equal(items.length, 0);
+    const decisions = await lobby.recentDecisions("alpha");
+    assert.equal(decisions.length, 1);
+    assert.equal(decisions[0]?.decision, "approve");
   });
 
-  assert.equal(response.statusCode, 200);
-  assert.equal(response.json().joinState, "waiting");
-  assert.match(response.json().requestId, /^req_/);
+  test("decide returns ok false for an unknown request", async () => {
+    const lobby = newLobby();
+    const decided = await lobby.decide("alpha", "sess_missing", "deny", now());
+    assert.equal(decided.ok, false);
+  });
 
-  await app.close();
+  test("recentDecisions is bounded by the cap", async () => {
+    const lobby = newLobby(2);
+    const r1 = await lobby.enqueue({ roomSlug: "alpha", displayName: "A", now: now() });
+    const r2 = await lobby.enqueue({ roomSlug: "alpha", displayName: "B", now: now(1) });
+    const r3 = await lobby.enqueue({ roomSlug: "alpha", displayName: "C", now: now(2) });
+    await lobby.decide("alpha", r1, "approve", now(3));
+    await lobby.decide("alpha", r2, "approve", now(4));
+    await lobby.decide("alpha", r3, "approve", now(5));
+    const recent = await lobby.recentDecisions("alpha");
+    assert.equal(recent.length, 2);
+    assert.equal(recent[0]?.requestId, r2);
+    assert.equal(recent[1]?.requestId, r3);
+  });
+
+  test("list returns only the queue for the given room", async () => {
+    const lobby = newLobby();
+    await lobby.enqueue({ roomSlug: "alpha", displayName: "Alice", now: now() });
+    await lobby.enqueue({ roomSlug: "beta", displayName: "Bob", now: now() });
+    assert.equal((await lobby.list("alpha")).length, 1);
+    assert.equal((await lobby.list("beta")).length, 1);
+  });
 });
 
-test("lobby requests can be listed and approved by the host", async () => {
-  const app = buildApp();
+describe("createRedisLobby", () => {
+  function makeRedis(): RedisLike {
+    return new RedisMock() as unknown as RedisLike;
+  }
 
-  const createResponse = await app.inject({
-    method: "POST",
-    url: "/api/rooms",
-    payload: {
-      accessMode: "lobby",
-    },
+  function newLobby(suffix: string, cap?: number): Lobby {
+    return createRedisLobby({
+      redis: makeRedis(),
+      keyPrefix: `lowtime-test-lobby-${suffix}-${Math.random().toString(36).slice(2, 8)}`,
+      recentDecisionsCap: cap,
+    });
+  }
+
+  test("enqueue then list returns the request", async () => {
+    const lobby = newLobby("enqueue");
+    const id = await lobby.enqueue({ roomSlug: "alpha", displayName: "Alice", now: now() });
+    assert.equal(typeof id, "string");
+    const items = await lobby.list("alpha");
+    assert.equal(items.length, 1);
+    assert.equal(items[0]?.displayName, "Alice");
   });
 
-  const { roomSlug, hostSecret } = createResponse.json();
-
-  const joinResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/join`,
-    payload: {
-      displayName: "Lobby Guest",
-    },
+  test("decide marks the request as approved", async () => {
+    const lobby = newLobby("decide");
+    const id = await lobby.enqueue({ roomSlug: "alpha", displayName: "Bob", now: now() });
+    const decided = await lobby.decide("alpha", id, "deny", now(1000));
+    assert.equal(decided.ok, true);
+    const items = await lobby.list("alpha");
+    assert.equal(items.length, 0);
   });
 
-  const { requestId } = joinResponse.json();
-
-  const listResponse = await app.inject({
-    method: "GET",
-    url: `/api/rooms/${roomSlug}/lobby`,
-    headers: {
-      "x-host-secret": hostSecret,
-    },
+  test("recentDecisions is bounded by the cap", async () => {
+    const lobby = newLobby("cap", 2);
+    const r1 = await lobby.enqueue({ roomSlug: "alpha", displayName: "A", now: now() });
+    const r2 = await lobby.enqueue({ roomSlug: "alpha", displayName: "B", now: now(1) });
+    const r3 = await lobby.enqueue({ roomSlug: "alpha", displayName: "C", now: now(2) });
+    await lobby.decide("alpha", r1, "approve", now(3));
+    await lobby.decide("alpha", r2, "approve", now(4));
+    await lobby.decide("alpha", r3, "approve", now(5));
+    const recent = await lobby.recentDecisions("alpha");
+    assert.equal(recent.length, 2);
   });
 
-  assert.equal(listResponse.statusCode, 200);
-  assert.deepEqual(
-    listResponse.json().requests.map((entry: { requestId: string; displayName: string }) => ({
-      requestId: entry.requestId,
-      displayName: entry.displayName,
-    })),
-    [
-      {
-        requestId,
-        displayName: "Lobby Guest",
-      },
-    ],
-  );
-
-  const approveResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/lobby/${requestId}/approve`,
-    headers: {
-      "x-host-secret": hostSecret,
-    },
+  test("list returns only the queue for the given room", async () => {
+    const lobby = newLobby("list");
+    await lobby.enqueue({ roomSlug: "alpha", displayName: "Alice", now: now() });
+    await lobby.enqueue({ roomSlug: "beta", displayName: "Bob", now: now() });
+    assert.equal((await lobby.list("alpha")).length, 1);
+    assert.equal((await lobby.list("beta")).length, 1);
   });
-
-  assert.equal(approveResponse.statusCode, 200);
-  assert.equal(approveResponse.json().status, "approved");
-  assert.match(approveResponse.json().sessionId, /^sess_/);
-  assert.equal(approveResponse.json().transportPreference, "sfu");
-
-  const statusResponse = await app.inject({
-    method: "GET",
-    url: `/api/rooms/${roomSlug}/lobby/${requestId}`,
-  });
-
-  assert.equal(statusResponse.statusCode, 200);
-  assert.equal(statusResponse.json().status, "approved");
-  assert.equal(statusResponse.json().sessionId, approveResponse.json().sessionId);
-
-  await app.close();
-});
-
-test("lobby requests can be denied by the host", async () => {
-  const app = buildApp();
-
-  const createResponse = await app.inject({
-    method: "POST",
-    url: "/api/rooms",
-    payload: {
-      accessMode: "lobby",
-    },
-  });
-
-  const { roomSlug, hostSecret } = createResponse.json();
-
-  const joinResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/join`,
-    payload: {
-      displayName: "Denied Guest",
-    },
-  });
-
-  const { requestId } = joinResponse.json();
-
-  const denyResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/lobby/${requestId}/deny`,
-    headers: {
-      "x-host-secret": hostSecret,
-    },
-  });
-
-  assert.equal(denyResponse.statusCode, 200);
-  assert.deepEqual(denyResponse.json(), {
-    status: "denied",
-    reason: "host_denied",
-  });
-
-  const statusResponse = await app.inject({
-    method: "GET",
-    url: `/api/rooms/${roomSlug}/lobby/${requestId}`,
-  });
-
-  assert.equal(statusResponse.statusCode, 200);
-  assert.deepEqual(statusResponse.json(), {
-    status: "denied",
-    reason: "host_denied",
-  });
-
-  await app.close();
-});
-
-test("lobby host endpoints require the host secret", async () => {
-  const app = buildApp();
-
-  const createResponse = await app.inject({
-    method: "POST",
-    url: "/api/rooms",
-    payload: {
-      accessMode: "lobby",
-    },
-  });
-
-  const { roomSlug } = createResponse.json();
-
-  const response = await app.inject({
-    method: "GET",
-    url: `/api/rooms/${roomSlug}/lobby`,
-  });
-
-  assert.equal(response.statusCode, 403);
-  assert.deepEqual(response.json(), {
-    message: "Host secret is required",
-  });
-
-  await app.close();
-});
-
-
-test("Approving a lobby request bumps lastActivityAt on the host's room", async () => {
-  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
-
-  const store = createInMemoryRoomStore();
-  let simulated = new Date("2026-03-24T12:00:00.000Z");
-  const app = buildApp({
-    now: () => simulated,
-    roomStore: store,
-  });
-
-  const createResponse = await app.inject({
-    method: "POST",
-    url: "/api/rooms",
-    payload: { accessMode: "lobby" },
-  });
-  const { roomSlug, hostSecret } = createResponse.json();
-  const beforeApprove = store.getRoom(roomSlug)?.lastActivityAt;
-
-  // Guest enters the lobby queue. This is a waiting join and must not bump.
-  simulated = new Date(simulated.getTime() + 60_000);
-  const joinResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/join`,
-    payload: { displayName: "Guest" },
-  });
-  const { requestId } = joinResponse.json();
-  assert.equal(store.getRoom(roomSlug)?.lastActivityAt, beforeApprove);
-
-  // Host approves. Activity clock must advance.
-  simulated = new Date(simulated.getTime() + 60_000);
-  const approveResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/lobby/${requestId}/approve`,
-    headers: { "x-host-secret": hostSecret },
-  });
-  assert.equal(approveResponse.statusCode, 200);
-  const afterApprove = store.getRoom(roomSlug)?.lastActivityAt;
-  assert.equal(afterApprove, simulated.toISOString());
-
-  await app.close();
-});
-
-test("Denying a lobby request does NOT bump lastActivityAt", async () => {
-  const { createInMemoryRoomStore } = await import("./domain/room-store.js");
-
-  const store = createInMemoryRoomStore();
-  let simulated = new Date("2026-03-24T12:00:00.000Z");
-  const app = buildApp({
-    now: () => simulated,
-    roomStore: store,
-  });
-
-  const createResponse = await app.inject({
-    method: "POST",
-    url: "/api/rooms",
-    payload: { accessMode: "lobby" },
-  });
-  const { roomSlug, hostSecret } = createResponse.json();
-
-  simulated = new Date(simulated.getTime() + 60_000);
-  const joinResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/join`,
-    payload: { displayName: "Guest" },
-  });
-  const { requestId } = joinResponse.json();
-  const beforeDeny = store.getRoom(roomSlug)?.lastActivityAt;
-
-  simulated = new Date(simulated.getTime() + 60_000);
-  const denyResponse = await app.inject({
-    method: "POST",
-    url: `/api/rooms/${roomSlug}/lobby/${requestId}/deny`,
-    headers: { "x-host-secret": hostSecret },
-  });
-  assert.equal(denyResponse.statusCode, 200);
-
-  const afterDeny = store.getRoom(roomSlug)?.lastActivityAt;
-  assert.equal(afterDeny, beforeDeny);
-
-  await app.close();
 });
