@@ -49,10 +49,6 @@ const DEFAULT_COOLDOWN_MS = 60_000;
 
 const KEY_DELIMITER = "\u0001";
 
-function buildKey(prefix: string, internalKey: string): string {
-  return `${prefix}:${internalKey}`;
-}
-
 function buildFailuresKey(prefix: string, internalKey: string): string {
   return `${prefix}:${internalKey}:failures`;
 }
