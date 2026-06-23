@@ -4,7 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerLobbyRoutes } from "./routes/lobby.js";
 import { registerMediaRoutes } from "./routes/media.js";
-import { registerParticipantsRoutes } from "./routes/participants.js";
+import { registerMetricsRoutes } from "./routes/metrics.js";
 import { registerReclaimRoutes } from "./routes/reclaim.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
@@ -34,8 +34,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   registerMediaRoutes(app, context);
   registerSettingsRoutes(app, context);
   registerReclaimRoutes(app, context);
-  registerParticipantsRoutes(app, context);
   registerSignalRoutes(app, context);
+  registerMetricsRoutes(app, context);
 
   const intervalMs = options.cleanupIntervalMs;
   if (typeof intervalMs === "number" && Number.isFinite(intervalMs) && intervalMs > 0) {
