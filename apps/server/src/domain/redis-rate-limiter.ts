@@ -38,7 +38,7 @@ export interface RedisLike {
   del(...keys: string[]): Promise<number>;
   get(key: string): Promise<string | null>;
   set(key: string, value: string, mode: string, duration: number): Promise<unknown>;
-  scan(cursor: string | number, ...args: string[]): Promise<[string | number, string[]]>;
+  scan(cursor: string | number, ...args: (string | number)[]): Promise<[string | number, string[]]>;
 }
 
 export interface RedisLimiterOptionsBase {
