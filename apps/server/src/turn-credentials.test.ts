@@ -45,13 +45,14 @@ describe("generateTurnCredentials", () => {
   });
 
   test("rejects a credential whose timestamp is older than the ttl", () => {
-    const nowSec = 1_700_000_000;
+    const nowSec = 1_000_000;
     const issued = generateTurnCredentials({
       secret: "s",
-      ttlSec: 60,
+      ttlSec: 10,
       now: () => nowSec * 1000,
     });
-    const later = nowSec + 61;
+    // 1 hour past the ttl so there is no edge case at the boundary.
+    const later = nowSec + 3_600 + 30;
     const ok = verifyTurnCredentials({
       secret: "s",
       credential: issued.credential,
