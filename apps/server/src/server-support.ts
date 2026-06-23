@@ -28,6 +28,10 @@ import {
   createInMemoryRoomCreateRateLimiter,
   type RoomCreateRateLimiter,
 } from "./domain/room-create-rate-limiter.js";
+import {
+  createInMemoryMetrics,
+  type MetricsRegistry,
+} from "./domain/metrics.js";
 
 /** Default ICE servers used when no override is provided. */
 export const DEFAULT_ICE_SERVERS: IceServerConfig[] = [
@@ -71,6 +75,8 @@ export interface BuildAppOptions {
   trustProxy?: FastifyServerOptions["trustProxy"];
   /** Injected per-IP room-create rate limiter. Defaults to an in-memory limiter. */
   roomCreateRateLimiter?: RoomCreateRateLimiter;
+  /** Injected metrics registry. Defaults to a fresh in-process registry. */
+  metrics?: MetricsRegistry;
 }
 
 export interface RouteContext {
@@ -83,6 +89,7 @@ export interface RouteContext {
   signalBus: SignalBus;
   iceServers: IceServerConfig[];
   roomCreateRateLimiter: RoomCreateRateLimiter;
+  metrics: MetricsRegistry;
 }
 
 export function createRouteContext(options: BuildAppOptions = {}): RouteContext {
@@ -97,6 +104,7 @@ export function createRouteContext(options: BuildAppOptions = {}): RouteContext 
     iceServers: options.iceServers ?? DEFAULT_ICE_SERVERS,
     roomCreateRateLimiter:
       options.roomCreateRateLimiter ?? createInMemoryRoomCreateRateLimiter(),
+    metrics: options.metrics ?? createInMemoryMetrics(),
   };
 }
 
