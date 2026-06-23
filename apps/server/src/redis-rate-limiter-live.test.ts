@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { describe, test } from "node:test";
 
-import IORedis from "ioredis";
+import IORedis, { type Redis as IORedisType } from "ioredis";
 
 import {
   createRedisPasscodeRateLimiter,
@@ -72,7 +72,7 @@ describe("createRedisPasscodeRateLimiter (live Redis)", () => {
     assert.equal(await limiter.shouldAllow(key), true);
 
     await limiter.clear("alpha-live" as never);
-    await (redis as unknown as IORedis).quit();
+    await (redis as unknown as IORedisType).quit();
   });
 });
 
@@ -98,6 +98,6 @@ describe("createRedisRoomCreateRateLimiter (live Redis)", () => {
     assert.equal(await limiter.shouldAllow("203.0.113.42"), true);
 
     await limiter.clearAll();
-    await (redis as unknown as IORedis).quit();
+    await (redis as unknown as IORedisType).quit();
   });
 });

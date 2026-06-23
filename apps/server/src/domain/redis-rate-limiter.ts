@@ -144,7 +144,7 @@ export function createRedisPasscodeRateLimiter(
   }
 
   return {
-    async shouldAllow(key) {
+    async shouldAllow(key: RateLimitKey) {
       const at = now();
       const cooldown = await readCooldown(redis, cooldownKey(key));
       if (cooldown != null && at < cooldown) {
@@ -156,7 +156,7 @@ export function createRedisPasscodeRateLimiter(
       await pruneAndCount(redis, failuresKey(key), at, windowMs);
       return true;
     },
-    async recordFailure(key) {
+    async recordFailure(key: RateLimitKey) {
       const at = now();
       await pruneAndCount(redis, failuresKey(key), at, windowMs);
       await redis.zadd(failuresKey(key), at, `${at}-${Math.random().toString(36).slice(2, 10)}`);
@@ -170,7 +170,7 @@ export function createRedisPasscodeRateLimiter(
         );
       }
     },
-    async recordSuccess(key) {
+    async recordSuccess(key: RateLimitKey) {
       await Promise.all([redis.del(failuresKey(key)), redis.del(cooldownKey(key))]);
     },
     async clear(slug: RoomSlug) {
@@ -181,7 +181,7 @@ export function createRedisPasscodeRateLimiter(
         await redis.del(...toDelete);
       }
     },
-    async getState(key) {
+    async getState(key: RateLimitKey) {
       const at = now();
       const count = await pruneAndCount(redis, failuresKey(key), at, windowMs);
       const cooldown = await readCooldown(redis, cooldownKey(key));
