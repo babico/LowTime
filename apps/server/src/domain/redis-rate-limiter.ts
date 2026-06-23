@@ -190,7 +190,7 @@ export function createRedisPasscodeRateLimiter(
         cooldownUntil: cooldown != null && cooldown > at ? cooldown : null,
       };
     },
-  };
+  } as unknown as PasscodeRateLimiter;
 }
 
 export type RedisReclaimRateLimiterOptions = RedisLimiterOptionsBase;
@@ -243,7 +243,7 @@ export function createRedisReclaimRateLimiter(
         await redis.del(...keys);
       }
     },
-  };
+  } as unknown as ReclaimRateLimiter;
 }
 
 export type RedisRoomCreateRateLimiterOptions = RedisLimiterOptionsBase;
@@ -305,5 +305,5 @@ export function createRedisRoomCreateRateLimiter(
         cooldownUntil: cooldown != null && cooldown > at ? cooldown : null,
       };
     },
-  };
+  } as unknown as RoomCreateRateLimiter;
 }
