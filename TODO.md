@@ -111,6 +111,8 @@
 
 ## Followups (post-Phase 5)
 
+| Feature | Status | Notes | Source |
+| --- | --- | --- | --- |
 | Persist chosen camera and microphone | `done` | Issue #97. `saveDeviceChoice` / `loadDeviceChoice` / `clearDeviceChoice` in `apps/web/src/device-choice-storage.ts`; sessionStorage under `lowtime:device-choice`. Call-page device switcher (#25) is the natural call site. | [docs/07-frontend-architecture.md](docs/07-frontend-architecture.md) |
 | Host remove from room page | `done` | Issue #99. `use-room-moderation` hook + Remove button in the room-page admitted-sessions list, reuses the call-page `host-actions.ts` wrapper. | [docs/03-room-and-user-flows.md](docs/03-room-and-user-flows.md) |
 | Wire Redis presence into BuildAppOptions | `planned` | Use `createRedisPresence` when `REDIS_URL` is set; otherwise in-memory. Mirrors the rate-limiter wiring from #102. | [docs/06-data-model-and-lifecycle.md](docs/06-data-model-and-lifecycle.md) |
